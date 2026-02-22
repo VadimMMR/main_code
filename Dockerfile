@@ -1,5 +1,5 @@
 # Первый этап: берём образ с библиотеками
-FROM daygo555/device-os-libs@sha256:f79a40dd987ca5aa17eaed0251a40fac1b997312396b7f5c1e542fec27c66cc1 AS libs
+FROM dayg0555/device-os-libs@sha256:f79a40dd987ca5aa17eaed0251a40fac1b997312396b7f5c1e542fec27c66cc1 AS libs
 
 FROM python:3.11-slim
 
