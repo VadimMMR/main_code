@@ -1,7 +1,6 @@
 import sys
 import os
-sys.path.append(r'C:\Games\miner_project')
-from device_lib.main import get_device_info  
+from device_lib.main import get_device_info
 import json
 
 def get_info_device():
