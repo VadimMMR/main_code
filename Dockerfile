@@ -12,19 +12,20 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Копируем requirements и устанавливаем зависимости
+# Копируем и устанавливаем зависимости Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем ВСЮ библиотеку device_lib в рабочую директорию
+COPY device_lib/ /app/device_lib/
 
 # Копируем тестовый скрипт
 COPY main.py .
 
-# Переменные окружения для подключения к БД
+# Переменные окружения для БД (если нужны)
 ENV DB_HOST=ep-dawn-surf-abgw0kss-pooler.eu-west-2.aws.neon.tech
 ENV DB_NAME=neondb
 ENV DB_USER=neondb_owner
 ENV DB_PORT=5432
-# Пароль нужно передавать при запуске: -e DB_PASSWORD=...
 
-# Запуск тестового скрипта
 CMD ["python", "main.py"]
