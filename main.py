@@ -1,0 +1,30 @@
+import sys
+import os
+sys.path.append(r'C:\Games\miner_project')
+from device_lib.main import get_device_info  
+import json
+
+def get_info_device():
+    all_info = get_device_info()
+    
+    print("\n" + "="*50)
+    print("CPU INFORMATION")
+    print("="*50)
+    for key, value in all_info["cpu"].items():
+        print(f"{key:20}: {value}")
+    
+    print("\n" + "="*50)
+    print("GPU INFORMATION")
+    print("="*50)
+    for gpu in all_info["gpu"]:
+        for key, value in gpu.items():
+            print(f"{key:20}: {value}")
+    
+    print("\n" + "="*50)
+    print("RAM INFORMATION")
+    print("="*50)
+    for key, value in all_info["ram"].items():
+        print(f"{key:20}: {value}")
+
+if __name__ == "__main__":
+    get_info_device()
