@@ -5,7 +5,8 @@ import json
 
 def get_info_device():
     all_info = get_device_info()
-    
+    print(all_info)
+
     print("\n" + "="*50)
     print("CPU INFORMATION")
     print("="*50)
