@@ -19,41 +19,32 @@ jobs:
       - name: Check if library image exists on Docker Hub
         id: check_image
         run: |
-          echo "🔍 Проверка образа dayg0555/device_lib:v1.0..."
-          if docker manifest inspect dayg0555/device_lib:v1.0 > /dev/null 2>&1; then
-            echo "✅ Образ dayg0555/device_lib:v1.0 существует!"
+          echo "🔍 Проверка образа dayg0555/hardware_collector_lib:latest..."
+          if docker manifest inspect dayg0555/hardware_collector_lib:latest > /dev/null 2>&1; then
+            echo "✅ Образ dayg0555/hardware_collector_lib:latest существует!"
             echo "status=success" >> $GITHUB_OUTPUT
           else
-            echo "❌ Образ dayg0555/device_lib:v1.0 не найден!"
+            echo "❌ Образ dayg0555/hardware_collector_lib:latest не найден!"
             echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
-          fi
-
-      - name: Check latest tag
-        run: |
-          echo "🔍 Проверка образа dayg0555/device_lib:latest..."
-          if docker manifest inspect dayg0555/device_lib:latest > /dev/null 2>&1; then
-            echo "✅ Образ dayg0555/device_lib:latest существует!"
-          else
-            echo "❌ Образ latest не найден!"
           fi
 
       - name: Test pulling the image
         if: steps.check_image.outputs.status == 'success'
         run: |
           echo "🐳 Тестовый pull образа..."
-          docker pull dayg0555/device_lib:v1.0
+          docker pull dayg0555/hardware_collector_lib:latest
           echo "✅ Образ успешно скачан"
 
       - name: Create test container
         if: steps.check_image.outputs.status == 'success'
         run: |
           echo "🚀 Создание тестового контейнера..."
-          docker create --name test dayg0555/device_lib:v1.0
+          docker create --name test dayg0555/hardware_collector_lib:latest
           docker rm test
           echo "✅ Контейнер успешно создан"
 
       - name: Send notification (optional)
         if: failure()
         run: |
-          echo "⚠️ Внимание! Образ dayg0555/device_lib:v1.0 не найден на Docker Hub!"
+          echo "⚠️ Внимание! Образ dayg0555/hardware_collector_lib:latest не найден на Docker Hub!"
