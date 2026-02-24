@@ -5,8 +5,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Копируем библиотеки из первого образа — ПРАВИЛЬНЫЙ ПУТЬ!
-COPY --from=libs /app/device_lib/ /app/device_lib/
+# Копируем библиотеку из правильного пути в правильное место
+COPY --from=libs /app/hardware_collector_lib/ /app/hardware_collector_lib/
 
 # Копируем requirements и main.py
 COPY requirements.txt .
