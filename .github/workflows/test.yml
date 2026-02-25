@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # ручной запуск
+  workflow_dispatch:
 
 jobs:
   test:
@@ -13,7 +13,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.9', '3.10', '3.11']
-      fail-fast: false  # продолжать тесты даже если одна ОС упала
+      fail-fast: false
 
     runs-on: ${{ matrix.os }}
 
@@ -30,60 +30,131 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install psutil py-cpuinfo wmi  # если нужно
+        pip install psutil py-cpuinfo wmi
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
+    - name: Debug info
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Python version: $(python --version)"
+        echo "PYTHONPATH: $PYTHONPATH"
+        ls -la
+        ls -la hardware_collector_lib/ || echo "hardware_collector_lib folder not found"
 
     - name: Test CPU detection
       run: |
         python -c "
-        from hardware_collector_lib.CPU.get_cpu import choice_get_cpu_function
-        import platform
-        os_name = platform.system()
-        print(f'Testing on {os_name}')
-        result = choice_get_cpu_function(os_name)
-        print(f'CPU Info: {result}')
-        assert result is not None, 'CPU detection failed'
-        "
+import sys
+import platform
+print('Python path:', sys.path)
+
+try:
+    from hardware_collector_lib.CPU.get_cpu import choice_get_cpu_function
+    print('✅ Import successful')
+    
+    os_name = platform.system()
+    print(f'Testing on {os_name}')
+    
+    result = choice_get_cpu_function(os_name)
+    print(f'CPU Info: {result}')
+    
+    assert result is not None, 'CPU detection failed'
+    assert 'cpu_cores' in result, 'Missing cpu_cores'
+    assert 'cpu_model' in result, 'Missing cpu_model'
+    print('✅ CPU test passed')
+    
+except Exception as e:
+    print(f'❌ Error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
 
     - name: Test GPU detection
       run: |
         python -c "
-        from hardware_collector_lib.GPU.get_gpu import choice_get_gpu_function
-        import platform
-        os_name = platform.system()
-        print(f'Testing GPU on {os_name}')
-        result = choice_get_gpu_function(os_name)
-        print(f'GPU Info: {result}')
-        # GPU может отсутствовать, не делаем assert
-        "
+import sys
+import platform
+
+try:
+    from hardware_collector_lib.GPU.get_gpu import choice_get_gpu_function
+    print('✅ GPU import successful')
+    
+    os_name = platform.system()
+    print(f'Testing GPU on {os_name}')
+    
+    result = choice_get_gpu_function(os_name)
+    print(f'GPU Info: {result}')
+    # GPU может отсутствовать, просто проверяем что код не падает
+    print('✅ GPU test passed')
+    
+except Exception as e:
+    print(f'❌ Error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
 
     - name: Test RAM detection
       run: |
         python -c "
-        from hardware_collector_lib.RAM.get_ram import choice_get_ram_function
-        import platform
-        os_name = platform.system()
-        print(f'Testing RAM on {os_name}')
-        result = choice_get_ram_function(os_name)
-        print(f'RAM Info: {result}')
-        assert result is not None, 'RAM detection failed'
-        "
+import sys
+import platform
+
+try:
+    from hardware_collector_lib.RAM.get_ram import choice_get_ram_function
+    print('✅ RAM import successful')
+    
+    os_name = platform.system()
+    print(f'Testing RAM on {os_name}')
+    
+    result = choice_get_ram_function(os_name)
+    print(f'RAM Info: {result}')
+    
+    assert result is not None, 'RAM detection failed'
+    assert 'ram_total_GB' in result, 'Missing ram_total_GB'
+    print('✅ RAM test passed')
+    
+except Exception as e:
+    print(f'❌ Error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
 
     - name: Test main function
       run: |
         python -c "
-        from hardware_collector_lib.main import get_device_info
-        result = get_device_info()
-        print(f'Device info: {result}')
-        assert 'cpu' in result, 'Missing CPU info'
-        assert 'gpu' in result, 'Missing GPU info'
-        assert 'ram' in result, 'Missing RAM info'
-        "
+import sys
 
-    - name: Upload test results (optional)
+try:
+    from hardware_collector_lib.main import get_device_info
+    print('✅ Main import successful')
+    
+    result = get_device_info()
+    print(f'Device info: {result}')
+    
+    assert 'cpu' in result, 'Missing CPU info'
+    assert 'gpu' in result, 'Missing GPU info'
+    assert 'ram' in result, 'Missing RAM info'
+    print('✅ Main test passed')
+    
+except Exception as e:
+    print(f'❌ Error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
+
+    - name: Upload test logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+        name: test-logs-${{ matrix.os }}-${{ matrix.python-version }}
         path: |
           *.log
           error_fallback.log
+          **/*.log
+        if-no-files-found: warn
