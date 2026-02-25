@@ -1,0 +1,89 @@
+name: Test hardware_collector_lib
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # ручной запуск
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+      fail-fast: false  # продолжать тесты даже если одна ОС упала
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install psutil py-cpuinfo wmi  # если нужно
+
+    - name: Test CPU detection
+      run: |
+        python -c "
+        from hardware_collector_lib.CPU.get_cpu import choice_get_cpu_function
+        import platform
+        os_name = platform.system()
+        print(f'Testing on {os_name}')
+        result = choice_get_cpu_function(os_name)
+        print(f'CPU Info: {result}')
+        assert result is not None, 'CPU detection failed'
+        "
+
+    - name: Test GPU detection
+      run: |
+        python -c "
+        from hardware_collector_lib.GPU.get_gpu import choice_get_gpu_function
+        import platform
+        os_name = platform.system()
+        print(f'Testing GPU on {os_name}')
+        result = choice_get_gpu_function(os_name)
+        print(f'GPU Info: {result}')
+        # GPU может отсутствовать, не делаем assert
+        "
+
+    - name: Test RAM detection
+      run: |
+        python -c "
+        from hardware_collector_lib.RAM.get_ram import choice_get_ram_function
+        import platform
+        os_name = platform.system()
+        print(f'Testing RAM on {os_name}')
+        result = choice_get_ram_function(os_name)
+        print(f'RAM Info: {result}')
+        assert result is not None, 'RAM detection failed'
+        "
+
+    - name: Test main function
+      run: |
+        python -c "
+        from hardware_collector_lib.main import get_device_info
+        result = get_device_info()
+        print(f'Device info: {result}')
+        assert 'cpu' in result, 'Missing CPU info'
+        assert 'gpu' in result, 'Missing GPU info'
+        assert 'ram' in result, 'Missing RAM info'
+        "
+
+    - name: Upload test results (optional)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+        path: |
+          *.log
+          error_fallback.log
