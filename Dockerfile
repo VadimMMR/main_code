@@ -1,4 +1,4 @@
-FROM dayg0555/hardware_collector_lib:v3.0 AS hardware_lib
+FROM dayg0555/hardware_collector_lib:v3.0-final AS hardware_lib
 FROM dayg0555/os-info-collector:latest AS os_lib
 
 FROM python:3.11-slim
