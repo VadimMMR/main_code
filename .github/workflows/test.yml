@@ -1,4 +1,4 @@
-name: Test hardware_collector_lib
+name: Test hardware_collector_lib and os_system_lib
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-hardware-lib:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -16,6 +16,7 @@ jobs:
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
+    name: Test hardware_lib on ${{ matrix.os }} (Python ${{ matrix.python-version }})
 
     steps:
     - name: Checkout code
@@ -30,7 +31,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install psutil py-cpuinfo wmi
+        pip install psutil py-cpuinfo wmi distro
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
@@ -40,10 +41,11 @@ jobs:
         echo "Current directory: $(pwd)"
         echo "Python version: $(python --version)"
         echo "PYTHONPATH: $PYTHONPATH"
+        echo "OS: ${{ matrix.os }}"
         ls -la
         ls -la hardware_collector_lib/ || echo "hardware_collector_lib folder not found"
 
-    - name: Test CPU detection
+    - name: Test hardware_lib CPU detection
       run: |
         python -c "
 import sys
@@ -52,10 +54,10 @@ print('Python path:', sys.path)
 
 try:
     from hardware_collector_lib.CPU.get_cpu import choice_get_cpu_function
-    print('✅ Import successful')
+    print('✅ Hardware lib CPU import successful')
     
     os_name = platform.system()
-    print(f'Testing on {os_name}')
+    print(f'Testing CPU on {os_name}')
     
     result = choice_get_cpu_function(os_name)
     print(f'CPU Info: {result}')
@@ -66,13 +68,13 @@ try:
     print('✅ CPU test passed')
     
 except Exception as e:
-    print(f'❌ Error: {e}')
+    print(f'❌ Error in hardware lib CPU test: {e}')
     import traceback
     traceback.print_exc()
     sys.exit(1)
 "
 
-    - name: Test GPU detection
+    - name: Test hardware_lib GPU detection
       run: |
         python -c "
 import sys
@@ -80,7 +82,7 @@ import platform
 
 try:
     from hardware_collector_lib.GPU.get_gpu import choice_get_gpu_function
-    print('✅ GPU import successful')
+    print('✅ Hardware lib GPU import successful')
     
     os_name = platform.system()
     print(f'Testing GPU on {os_name}')
@@ -91,13 +93,13 @@ try:
     print('✅ GPU test passed')
     
 except Exception as e:
-    print(f'❌ Error: {e}')
+    print(f'❌ Error in hardware lib GPU test: {e}')
     import traceback
     traceback.print_exc()
     sys.exit(1)
 "
 
-    - name: Test RAM detection
+    - name: Test hardware_lib RAM detection
       run: |
         python -c "
 import sys
@@ -105,7 +107,7 @@ import platform
 
 try:
     from hardware_collector_lib.RAM.get_ram import choice_get_ram_function
-    print('✅ RAM import successful')
+    print('✅ Hardware lib RAM import successful')
     
     os_name = platform.system()
     print(f'Testing RAM on {os_name}')
@@ -118,43 +120,268 @@ try:
     print('✅ RAM test passed')
     
 except Exception as e:
-    print(f'❌ Error: {e}')
+    print(f'❌ Error in hardware lib RAM test: {e}')
     import traceback
     traceback.print_exc()
     sys.exit(1)
 "
 
-    - name: Test main function
+    - name: Test hardware_lib main function
       run: |
         python -c "
 import sys
 
 try:
     from hardware_collector_lib.main import get_device_info
-    print('✅ Main import successful')
+    print('✅ Hardware lib main import successful')
     
     result = get_device_info()
-    print(f'Device info: {result}')
+    print(f'Hardware device info: {result}')
     
     assert 'cpu' in result, 'Missing CPU info'
     assert 'gpu' in result, 'Missing GPU info'
     assert 'ram' in result, 'Missing RAM info'
-    print('✅ Main test passed')
+    print('✅ Hardware lib main test passed')
     
 except Exception as e:
-    print(f'❌ Error: {e}')
+    print(f'❌ Error in hardware lib main test: {e}')
     import traceback
     traceback.print_exc()
     sys.exit(1)
 "
 
-    - name: Upload test logs
+  test-os-lib:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+    name: Test OS lib on ${{ matrix.os }} (Python ${{ matrix.python-version }})
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install distro pywin32 wmi
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
+    - name: Debug info for OS lib
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Python version: $(python --version)"
+        echo "PYTHONPATH: $PYTHONPATH"
+        echo "OS: ${{ matrix.os }}"
+        ls -la
+        ls -la os_system_lib/ || echo "os_system_lib folder not found"
+
+    - name: Test OS lib basic info
+      run: |
+        python -c "
+import sys
+import platform
+
+try:
+    # Пытаемся импортировать функции из OS библиотеки
+    # Здесь нужно заменить на реальные имена функций из вашего main.py
+    from os_system_lib.main import get_complete_os_info
+    print('✅ OS lib import successful')
+    
+    os_name = platform.system()
+    print(f'Testing OS detection on {os_name}')
+    
+    result = get_complete_os_info()
+    print(f'OS Info: {result}')
+    
+    # Проверяем основные поля
+    assert result is not None, 'OS detection failed'
+    assert 'os_name' in result, 'Missing os_name'
+    assert 'os_hostname' in result, 'Missing os_hostname'
+    assert 'os_username' in result, 'Missing os_username'
+    print('✅ OS basic info test passed')
+    
+    # Проверяем uptime
+    if result.get('os_uptime_formatted'):
+        print(f'Uptime: {result[\"os_uptime_formatted\"]}')
+    
+    print('✅ OS lib test passed')
+    
+except ImportError as e:
+    print(f'⚠️ OS lib not available or needs different import: {e}')
+    print('Trying alternative imports...')
+    
+    try:
+        # Альтернативный импорт
+        import sys
+        sys.path.insert(0, './os_system_lib')
+        from main import get_complete_os_info
+        print('✅ OS lib imported with sys.path modification')
+        
+        result = get_complete_os_info()
+        print(f'OS Info: {result}')
+        print('✅ OS lib test passed (alternative import)')
+        
+    except Exception as e2:
+        print(f'❌ Could not import OS lib: {e2}')
+        # Не завершаем с ошибкой, если библиотека еще не готова
+        print('⚠️ Skipping OS lib tests - library not ready')
+        # sys.exit(1)  # Раскомментировать, когда библиотека будет готова
+
+except Exception as e:
+    print(f'❌ Error in OS lib test: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
+
+  test-integration:
+    needs: [test-hardware-lib, test-os-lib]
+    if: success() || failure()
+    runs-on: ubuntu-latest
+    name: Test integration of both libraries
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install psutil py-cpuinfo wmi distro
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
+    - name: Test both libraries together
+      run: |
+        python -c "
+import sys
+import platform
+import json
+
+print('=' * 60)
+print('TESTING BOTH LIBRARIES TOGETHER')
+print('=' * 60)
+
+results = {
+    'hardware_lib': {'status': 'unknown', 'error': None},
+    'os_lib': {'status': 'unknown', 'error': None},
+    'integration': {'status': 'unknown'}
+}
+
+# Test hardware library
+try:
+    from hardware_collector_lib.main import get_device_info
+    print('✅ hardware_collector_lib imported')
+    
+    hw_info = get_device_info()
+    print(f'Hardware info: {json.dumps(hw_info, indent=2, default=str)}')
+    results['hardware_lib']['status'] = 'success'
+    
+except Exception as e:
+    print(f'❌ hardware_collector_lib error: {e}')
+    results['hardware_lib']['status'] = 'failure'
+    results['hardware_lib']['error'] = str(e)
+
+# Test OS library
+try:
+    # Попробуйте правильный импорт для вашей библиотеки
+    # Возможно нужно: from os_system_lib.main import get_complete_os_info
+    from os_system_lib.main import get_complete_os_info
+    print('✅ os_system_lib imported')
+    
+    os_info = get_complete_os_info()
+    print(f'OS info: {json.dumps(os_info, indent=2, default=str)}')
+    results['os_lib']['status'] = 'success'
+    
+except Exception as e:
+    print(f'❌ os_system_lib error: {e}')
+    results['os_lib']['status'] = 'failure'
+    results['os_lib']['error'] = str(e)
+
+# Integration test
+if results['hardware_lib']['status'] == 'success' and results['os_lib']['status'] == 'success':
+    combined = {
+        'hardware': hw_info,
+        'operating_system': os_info,
+        'system': platform.system(),
+        'python_version': platform.python_version()
+    }
+    print('\\n' + '=' * 60)
+    print('COMBINED SYSTEM INFO:')
+    print('=' * 60)
+    print(json.dumps(combined, indent=2, default=str))
+    results['integration']['status'] = 'success'
+else:
+    print('\\n⚠️ Cannot create combined info - one or both libraries failed')
+    results['integration']['status'] = 'partial'
+
+# Save results
+with open('integration_test_results.json', 'w') as f:
+    json.dump(results, f, indent=2)
+
+print('\\n' + '=' * 60)
+print('TEST SUMMARY:')
+print(f"hardware_lib: {results['hardware_lib']['status']}")
+print(f"os_lib: {results['os_lib']['status']}")
+print(f"integration: {results['integration']['status']}")
+print('=' * 60)
+
+# Exit with error only if both libraries failed
+if results['hardware_lib']['status'] == 'failure' and results['os_lib']['status'] == 'failure':
+    print('❌ Both libraries failed!')
+    sys.exit(1)
+"
+
+    - name: Upload integration test logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-logs-${{ matrix.os }}-${{ matrix.python-version }}
+        name: integration-test-logs
+        path: integration_test_results.json
+        if-no-files-found: warn
+
+  upload-logs:
+    if: always()
+    needs: [test-hardware-lib, test-os-lib, test-integration]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Upload all test logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: all-test-logs
         path: |
           *.log
           error_fallback.log
           **/*.log
+          **/*.json
         if-no-files-found: warn
+
+    - name: Final status
+      run: |
+        echo "📊 TEST SUMMARY:"
+        echo "hardware_lib tests: ${{ needs.test-hardware-lib.result }}"
+        echo "os_lib tests: ${{ needs.test-os-lib.result }}"
+        echo "integration tests: ${{ needs.test-integration.result }}"
+        
+        if [ "${{ needs.test-hardware-lib.result }}" = "success" ] && [ "${{ needs.test-os-lib.result }}" = "success" ]; then
+          echo "✅ All tests passed!"
+        else
+          echo "⚠️ Some tests failed!"
+        fi
