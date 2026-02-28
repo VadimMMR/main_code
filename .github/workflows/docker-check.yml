@@ -16,7 +16,7 @@ jobs:
       matrix:
         image: [
           "dayg0555/hardware_collector_lib:latest",
-          "dayg0555/os-info-collector:latest"
+          "dayg0555/system_info_lib:latest"  # ИЗМЕНЕНО: новое название
         ]
       fail-fast: false  # продолжать проверку даже если один образ не найден
     
@@ -74,12 +74,12 @@ jobs:
             HW_STATUS="failure"
           fi
           
-          # Проверяем os-info-collector
-          if docker manifest inspect dayg0555/os-info-collector:latest > /dev/null 2>&1; then
-            echo "✅ os-info-collector: найден"
+          # Проверяем system_info_lib (НОВОЕ НАЗВАНИЕ)
+          if docker manifest inspect dayg0555/system_info_lib:latest > /dev/null 2>&1; then
+            echo "✅ system_info_lib: найден"
             OS_STATUS="success"
           else
-            echo "❌ os-info-collector: НЕ НАЙДЕН"
+            echo "❌ system_info_lib: НЕ НАЙДЕН"
             OS_STATUS="failure"
           fi
           
@@ -99,11 +99,11 @@ jobs:
         run: |
           echo "🏗️ Все образы найдены! Сборка основного проекта..."
           echo "FROM dayg0555/hardware_collector_lib:latest AS hw_lib" > Dockerfile.test
-          echo "FROM dayg0555/os-info-collector:latest AS os_lib" >> Dockerfile.test
+          echo "FROM dayg0555/system_info_lib:latest AS os_lib" >> Dockerfile.test  # ИЗМЕНЕНО
           echo "FROM python:3.11-slim" >> Dockerfile.test
           echo "WORKDIR /app" >> Dockerfile.test
           echo "COPY --from=hw_lib /app/ /app/hardware_collector_lib/" >> Dockerfile.test
-          echo "COPY --from=os_lib /app/ /app/os_system_lib/" >> Dockerfile.test
+          echo "COPY --from=os_lib /app/ /app/system_info_lib/" >> Dockerfile.test  # ИЗМЕНЕНО
           echo "COPY requirements.txt ." >> Dockerfile.test
           echo "RUN pip install --no-cache-dir -r requirements.txt" >> Dockerfile.test
           echo "COPY main.py ." >> Dockerfile.test
@@ -123,7 +123,7 @@ jobs:
             echo "  - dayg0555/hardware_collector_lib:latest"
           fi
           if [ "${{ steps.check_status.outputs.os_status }}" = "failure" ]; then
-            echo "  - dayg0555/os-info-collector:latest"
+            echo "  - dayg0555/system_info_lib:latest"  # ИЗМЕНЕНО
           fi
 
       - name: Send success notification
@@ -131,4 +131,4 @@ jobs:
         run: |
           echo "🎉 Все образы на Docker Hub доступны!"
           echo "hardware_collector_lib: ✅"
-          echo "os-info-collector: ✅"
+          echo "system_info_lib: ✅"  # ИЗМЕНЕНО
