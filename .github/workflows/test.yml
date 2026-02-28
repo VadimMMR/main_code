@@ -46,27 +46,21 @@ jobs:
         ls -la hardware_collector_lib/ || echo "hardware_collector_lib folder not found"
 
     - name: Test hardware_lib CPU detection
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
 print('Python path:', sys.path)
-
 try:
     from hardware_collector_lib.CPU.get_cpu import choice_get_cpu_function
     print('✅ Hardware lib CPU import successful')
-    
     os_name = platform.system()
     print(f'Testing CPU on {os_name}')
-    
     result = choice_get_cpu_function(os_name)
     print(f'CPU Info: {result}')
-    
     assert result is not None, 'CPU detection failed'
     assert 'cpu_cores' in result, 'Missing cpu_cores'
     assert 'cpu_model' in result, 'Missing cpu_model'
     print('✅ CPU test passed')
-    
 except Exception as e:
     print(f'❌ Error in hardware lib CPU test: {e}')
     import traceback
@@ -75,23 +69,17 @@ except Exception as e:
 "
 
     - name: Test hardware_lib GPU detection
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
-
 try:
     from hardware_collector_lib.GPU.get_gpu import choice_get_gpu_function
     print('✅ Hardware lib GPU import successful')
-    
     os_name = platform.system()
     print(f'Testing GPU on {os_name}')
-    
     result = choice_get_gpu_function(os_name)
     print(f'GPU Info: {result}')
-    # GPU может отсутствовать, просто проверяем что код не падает
     print('✅ GPU test passed')
-    
 except Exception as e:
     print(f'❌ Error in hardware lib GPU test: {e}')
     import traceback
@@ -100,25 +88,19 @@ except Exception as e:
 "
 
     - name: Test hardware_lib RAM detection
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
-
 try:
     from hardware_collector_lib.RAM.get_ram import choice_get_ram_function
     print('✅ Hardware lib RAM import successful')
-    
     os_name = platform.system()
     print(f'Testing RAM on {os_name}')
-    
     result = choice_get_ram_function(os_name)
     print(f'RAM Info: {result}')
-    
     assert result is not None, 'RAM detection failed'
     assert 'ram_total_GB' in result, 'Missing ram_total_GB'
     print('✅ RAM test passed')
-    
 except Exception as e:
     print(f'❌ Error in hardware lib RAM test: {e}')
     import traceback
@@ -127,22 +109,17 @@ except Exception as e:
 "
 
     - name: Test hardware_lib main function
-      run: |
-        python -c "
+      run: python -c "
 import sys
-
 try:
     from hardware_collector_lib.main import get_device_info
     print('✅ Hardware lib main import successful')
-    
     result = get_device_info()
     print(f'Hardware device info: {result}')
-    
     assert 'cpu' in result, 'Missing CPU info'
     assert 'gpu' in result, 'Missing GPU info'
     assert 'ram' in result, 'Missing RAM info'
     print('✅ Hardware lib main test passed')
-    
 except Exception as e:
     print(f'❌ Error in hardware lib main test: {e}')
     import traceback
@@ -187,34 +164,22 @@ except Exception as e:
         ls -la system_info_lib/ || echo "system_info_lib folder not found"
 
     - name: Test system_info_lib imports
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
-
 print('=' * 60)
 print('TESTING SYSTEM_INFO_LIB IMPORTS')
 print('=' * 60)
-
 try:
-    # Проверяем импорт основной функции
     from system_info_lib.main import get_system_info
     print('✅ get_system_info imported successfully')
-    
-    # Проверяем импорт оркестратора
     from system_info_lib.orchestrator import Orchestrator
     print('✅ Orchestrator imported successfully')
-    
-    # Проверяем импорт коллекторов
     from system_info_lib.collectors import get_collector
     print('✅ collectors imported successfully')
-    
-    # Проверяем импорт форматтеров
     from system_info_lib.formatters import JSONFormatter, YAMLFormatter, XMLFormatter, TableFormatter, HTMLFormatter
     print('✅ formatters imported successfully')
-    
     print('\\n✅ ALL IMPORTS SUCCESSFUL')
-    
 except Exception as e:
     print(f'❌ Import error: {e}')
     import traceback
@@ -223,59 +188,42 @@ except Exception as e:
 "
 
     - name: Test system_info_lib basic functionality
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import json
 import platform
-
 print('=' * 60)
 print('TESTING SYSTEM_INFO_LIB BASIC FUNCTIONALITY')
 print('=' * 60)
-
 try:
     from system_info_lib.main import get_system_info
-    
     os_name = platform.system()
     print(f'Testing on OS: {os_name}')
-    
-    # ТЕСТ 1: Minimal mode
     print('\\n📋 TEST 1: Minimal mode')
     result_minimal = get_system_info(mode='minimal', formatter=None)
     print(f'Result type: {type(result_minimal)}')
     print(f'Keys: {list(result_minimal.keys())}')
     print(f'Sample: {json.dumps(result_minimal, indent=2, default=str)}')
-    
     assert result_minimal is not None, 'Minimal mode returned None'
     assert 'os_name' in result_minimal, 'Missing os_name'
     assert 'hostname' in result_minimal, 'Missing hostname'
     assert 'username' in result_minimal, 'Missing username'
     print('✅ Minimal mode test passed')
-    
-    # ТЕСТ 2: Standard mode
     print('\\n📋 TEST 2: Standard mode')
     result_standard = get_system_info(mode='standard', formatter=None)
     print(f'Keys count: {len(result_standard.keys())}')
     print(f'Keys: {list(result_standard.keys())}')
-    
     assert len(result_standard.keys()) > len(result_minimal.keys()), 'Standard mode should have more keys than minimal'
     print('✅ Standard mode test passed')
-    
-    # ТЕСТ 3: Advanced mode
     print('\\n📋 TEST 3: Advanced mode')
     result_advanced = get_system_info(mode='advanced', formatter=None)
     print(f'Keys count: {len(result_advanced.keys())}')
-    
-    # Проверяем наличие дополнительных секций
     has_low_level = 'low_level' in result_advanced or any('low' in k.lower() for k in result_advanced.keys())
     has_drivers = 'drivers' in result_advanced or any('driver' in k.lower() for k in result_advanced.keys())
-    
     print(f'Has low_level data: {has_low_level}')
     print(f'Has drivers data: {has_drivers}')
     print('✅ Advanced mode test passed')
-    
     print('\\n✅ ALL BASIC TESTS PASSED')
-    
 except Exception as e:
     print(f'❌ Error in basic functionality test: {e}')
     import traceback
@@ -284,38 +232,27 @@ except Exception as e:
 "
 
     - name: Test system_info_lib formatters
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import json
-
 print('=' * 60)
 print('TESTING SYSTEM_INFO_LIB FORMATTERS')
 print('=' * 60)
-
 try:
     from system_info_lib.main import get_system_info
-    
-    # ТЕСТ 1: JSON formatter
     print('\\n📋 TEST 1: JSON formatter')
     json_result = get_system_info(mode='minimal', formatter='json')
     print(f'JSON output (first 200 chars):')
     print(json_result[:200] + '...')
-    
-    # Проверяем что это валидный JSON
     json_parsed = json.loads(json_result)
     assert 'os_name' in json_parsed, 'JSON parsing failed'
     print('✅ JSON formatter test passed')
-    
-    # ТЕСТ 2: YAML formatter
     print('\\n📋 TEST 2: YAML formatter')
     yaml_result = get_system_info(mode='minimal', formatter='yaml')
     print(f'YAML output:')
     print(yaml_result)
     assert 'os_name:' in yaml_result, 'YAML format incorrect'
     print('✅ YAML formatter test passed')
-    
-    # ТЕСТ 3: XML formatter
     print('\\n📋 TEST 3: XML formatter')
     xml_result = get_system_info(mode='minimal', formatter='xml')
     print(f'XML output:')
@@ -323,16 +260,12 @@ try:
     assert '<system_info>' in xml_result, 'XML format incorrect'
     assert '<os_name>' in xml_result, 'XML missing os_name tag'
     print('✅ XML formatter test passed')
-    
-    # ТЕСТ 4: Table formatter
     print('\\n📋 TEST 4: Table formatter')
     table_result = get_system_info(mode='minimal', formatter='table')
     print(f'Table output:')
     print(table_result)
     assert '+' in table_result and '|' in table_result, 'Table format incorrect'
     print('✅ Table formatter test passed')
-    
-    # ТЕСТ 5: HTML formatter
     print('\\n📋 TEST 5: HTML formatter')
     html_result = get_system_info(mode='minimal', formatter='html')
     print(f'HTML output (first 200 chars):')
@@ -340,9 +273,7 @@ try:
     assert '<!DOCTYPE html>' in html_result, 'HTML format incorrect'
     assert '<table>' in html_result, 'HTML missing table'
     print('✅ HTML formatter test passed')
-    
     print('\\n✅ ALL FORMATTER TESTS PASSED')
-    
 except Exception as e:
     print(f'❌ Error in formatters test: {e}')
     import traceback
@@ -351,39 +282,25 @@ except Exception as e:
 "
 
     - name: Test system_info_lib cross-platform compatibility
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
-
 print('=' * 60)
 print('TESTING CROSS-PLATFORM COMPATIBILITY')
 print('=' * 60)
-
 try:
     from system_info_lib.main import get_system_info
-    
     current_os = platform.system()
     print(f'Current OS: {current_os}')
-    
-    # Получаем информацию
     result = get_system_info(mode='standard', formatter=None)
-    
-    # Проверяем OS-специфичные поля
     if current_os == 'Windows':
         print('Checking Windows-specific fields...')
         assert 'os_edition' in result or 'os_build' in result, 'Missing Windows-specific fields'
-        
     elif current_os == 'Linux':
         print('Checking Linux-specific fields...')
-        # Для Linux могут быть свои специфичные поля
-        
     elif current_os == 'Darwin':
         print('Checking macOS-specific fields...')
-        # Для macOS свои специфичные поля
-    
     print(f'✅ {current_os} compatibility test passed')
-    
 except Exception as e:
     print(f'❌ Error in cross-platform test: {e}')
     import traceback
@@ -415,74 +332,55 @@ except Exception as e:
       run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
     - name: Test both libraries together
-      run: |
-        python -c "
+      run: python -c "
 import sys
 import platform
 import json
 from datetime import datetime
-
 print('=' * 70)
 print('TESTING BOTH LIBRARIES TOGETHER - INTEGRATION TEST')
 print('=' * 70)
-
 results = {
     'timestamp': datetime.now().isoformat(),
     'hardware_lib': {'status': 'unknown', 'error': None},
     'system_info_lib': {'status': 'unknown', 'error': None},
     'integration': {'status': 'unknown'}
 }
-
-# Test hardware library
 try:
     from hardware_collector_lib.main import get_device_info
     print('\\n✅ hardware_collector_lib imported')
-    
     hw_info = get_device_info()
     print(f'Hardware info keys: {list(hw_info.keys())}')
     results['hardware_lib']['status'] = 'success'
     results['hardware_lib']['data_keys'] = list(hw_info.keys())
-    
 except Exception as e:
     print(f'\\n❌ hardware_collector_lib error: {e}')
     results['hardware_lib']['status'] = 'failure'
     results['hardware_lib']['error'] = str(e)
-
-# Test system_info_lib
 try:
     from system_info_lib.main import get_system_info
     print('✅ system_info_lib imported')
-    
-    # Тестируем разные режимы
     os_info_minimal = get_system_info(mode='minimal', formatter=None)
     os_info_standard = get_system_info(mode='standard', formatter=None)
     os_info_advanced = get_system_info(mode='advanced', formatter=None)
-    
     print(f'Minimal OS info keys: {list(os_info_minimal.keys())}')
     print(f'Standard OS info keys count: {len(os_info_standard.keys())}')
     print(f'Advanced OS info keys count: {len(os_info_advanced.keys())}')
-    
     results['system_info_lib']['status'] = 'success'
     results['system_info_lib']['minimal_keys'] = list(os_info_minimal.keys())
     results['system_info_lib']['standard_count'] = len(os_info_standard.keys())
     results['system_info_lib']['advanced_count'] = len(os_info_advanced.keys())
-    
 except Exception as e:
     print(f'❌ system_info_lib error: {e}')
     results['system_info_lib']['status'] = 'failure'
     results['system_info_lib']['error'] = str(e)
-
-# Integration test - combine data from both libraries
 if results['hardware_lib']['status'] == 'success' and results['system_info_lib']['status'] == 'success':
     print('\\n' + '=' * 70)
     print('CREATING COMBINED SYSTEM REPORT')
     print('=' * 70)
-    
     try:
-        # Получаем свежие данные
         hw = get_device_info()
         os_info = get_system_info(mode='standard', formatter=None)
-        
         combined = {
             'timestamp': datetime.now().isoformat(),
             'system': {
@@ -496,15 +394,10 @@ if results['hardware_lib']['status'] == 'success' and results['system_info_lib']
             'hardware': hw,
             'operating_system': os_info
         }
-        
-        # Сохраняем комбинированный отчет
         with open('combined_system_report.json', 'w') as f:
             json.dump(combined, f, indent=2, default=str)
-        
         print('✅ Combined report created successfully')
         print(f'Report saved to: combined_system_report.json')
-        
-        # Выводим краткую информацию
         print('\\n📊 COMBINED SYSTEM SUMMARY:')
         print(f"OS: {os_info.get('os_name', 'Unknown')} {os_info.get('os_version', '')}")
         print(f"Hostname: {os_info.get('hostname', 'Unknown')}")
@@ -512,9 +405,7 @@ if results['hardware_lib']['status'] == 'success' and results['system_info_lib']
         print(f"CPU: {hw.get('cpu', {}).get('cpu_model', 'Unknown')}")
         print(f"CPU Cores: {hw.get('cpu', {}).get('cpu_cores', 'Unknown')}")
         print(f"RAM: {hw.get('ram', {}).get('ram_total_GB', 'Unknown')} GB")
-        
         results['integration']['status'] = 'success'
-        
     except Exception as e:
         print(f'❌ Error creating combined report: {e}')
         results['integration']['status'] = 'failure'
@@ -522,19 +413,14 @@ if results['hardware_lib']['status'] == 'success' and results['system_info_lib']
 else:
     print('\\n⚠️ Cannot create combined info - one or both libraries failed')
     results['integration']['status'] = 'skipped'
-
-# Save results
 with open('integration_test_results.json', 'w') as f:
     json.dump(results, f, indent=2)
-
 print('\\n' + '=' * 70)
 print('TEST SUMMARY:')
 print(f"hardware_lib: {results['hardware_lib']['status']}")
 print(f"system_info_lib: {results['system_info_lib']['status']}")
 print(f"integration: {results['integration']['status']}")
 print('=' * 70)
-
-# Exit with error only if both libraries failed
 if results['hardware_lib']['status'] == 'failure' and results['system_info_lib']['status'] == 'failure':
     print('❌ Both libraries failed!')
     sys.exit(1)

@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
-    - cron: '0 0 * * *'  # ежедневная проверка в полночь
-  workflow_dispatch:      # ручной запуск
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   check-docker-images:
@@ -16,9 +16,9 @@ jobs:
       matrix:
         image: [
           "dayg0555/hardware_collector_lib:latest",
-          "dayg0555/system_info_lib:latest"  # ИЗМЕНЕНО: новое название
+          "dayg0555/system_info_lib:latest"
         ]
-      fail-fast: false  # продолжать проверку даже если один образ не найден
+      fail-fast: false
     
     steps:
       - name: Checkout code
@@ -55,7 +55,7 @@ jobs:
   check-main-project:
     needs: check-docker-images
     runs-on: ubuntu-latest
-    if: success() || failure()  # запускается даже если некоторые проверки не прошли
+    if: success() || failure()
     
     steps:
       - name: Checkout code
@@ -74,7 +74,7 @@ jobs:
             HW_STATUS="failure"
           fi
           
-          # Проверяем system_info_lib (НОВОЕ НАЗВАНИЕ)
+          # Проверяем system_info_lib
           if docker manifest inspect dayg0555/system_info_lib:latest > /dev/null 2>&1; then
             echo "✅ system_info_lib: найден"
             OS_STATUS="success"
@@ -83,11 +83,9 @@ jobs:
             OS_STATUS="failure"
           fi
           
-          # Сохраняем статусы
           echo "hw_status=$HW_STATUS" >> $GITHUB_OUTPUT
           echo "os_status=$OS_STATUS" >> $GITHUB_OUTPUT
           
-          # Если оба образа не найдены - ошибка
           if [ "$HW_STATUS" = "failure" ] && [ "$OS_STATUS" = "failure" ]; then
             echo "❌ КРИТИЧЕСКАЯ ОШИБКА: Ни один из образов не найден!"
             exit 1
@@ -99,18 +97,17 @@ jobs:
         run: |
           echo "🏗️ Все образы найдены! Сборка основного проекта..."
           echo "FROM dayg0555/hardware_collector_lib:latest AS hw_lib" > Dockerfile.test
-          echo "FROM dayg0555/system_info_lib:latest AS os_lib" >> Dockerfile.test  # ИЗМЕНЕНО
+          echo "FROM dayg0555/system_info_lib:latest AS os_lib" >> Dockerfile.test
           echo "FROM python:3.11-slim" >> Dockerfile.test
           echo "WORKDIR /app" >> Dockerfile.test
           echo "COPY --from=hw_lib /app/ /app/hardware_collector_lib/" >> Dockerfile.test
-          echo "COPY --from=os_lib /app/ /app/system_info_lib/" >> Dockerfile.test  # ИЗМЕНЕНО
+          echo "COPY --from=os_lib /app/ /app/system_info_lib/" >> Dockerfile.test
           echo "COPY requirements.txt ." >> Dockerfile.test
           echo "RUN pip install --no-cache-dir -r requirements.txt" >> Dockerfile.test
           echo "COPY main.py ." >> Dockerfile.test
           echo "ENV PYTHONPATH=/app" >> Dockerfile.test
           echo "CMD [\"python\", \"main.py\"]" >> Dockerfile.test
           
-          # Пробная сборка
           docker build -f Dockerfile.test -t test-project .
           echo "✅ Пробная сборка прошла успешно!"
 
@@ -123,7 +120,7 @@ jobs:
             echo "  - dayg0555/hardware_collector_lib:latest"
           fi
           if [ "${{ steps.check_status.outputs.os_status }}" = "failure" ]; then
-            echo "  - dayg0555/system_info_lib:latest"  # ИЗМЕНЕНО
+            echo "  - dayg0555/system_info_lib:latest"
           fi
 
       - name: Send success notification
@@ -131,4 +128,4 @@ jobs:
         run: |
           echo "🎉 Все образы на Docker Hub доступны!"
           echo "hardware_collector_lib: ✅"
-          echo "system_info_lib: ✅"  # ИЗМЕНЕНО
+          echo "system_info_lib: ✅"
