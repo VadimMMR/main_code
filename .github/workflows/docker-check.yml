@@ -9,7 +9,6 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
-# Добавляем переменную окружения для подавления предупреждений о Node.js
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -32,7 +31,7 @@ jobs:
         id: check_image
         run: |
           echo "🔍 Проверка образа ${{ matrix.image }}..."
-          if docker manifest inspect ${{ matrix.image }} > /dev/null 2>&1; then
+          if timeout 30 docker manifest inspect ${{ matrix.image }} > /dev/null 2>&1; then
             echo "✅ Образ ${{ matrix.image }} существует!"
             echo "status=success" >> $GITHUB_OUTPUT
           else
@@ -59,7 +58,7 @@ jobs:
   check-main-project:
     needs: check-docker-images
     runs-on: ubuntu-latest
-    if: success() || failure()
+    if: always()  # Запускать всегда, независимо от успеха/неудачи предыдущих job
     
     steps:
       - name: Checkout code
@@ -71,7 +70,7 @@ jobs:
           echo "📋 Проверка всех необходимых образов:"
           
           # Проверяем hardware_collector_lib
-          if docker manifest inspect dayg0555/hardware_collector_lib:latest > /dev/null 2>&1; then
+          if timeout 30 docker manifest inspect dayg0555/hardware_collector_lib:latest > /dev/null 2>&1; then
             echo "✅ hardware_collector_lib: найден"
             HW_STATUS="success"
           else
@@ -80,7 +79,7 @@ jobs:
           fi
           
           # Проверяем system-info-library
-          if docker manifest inspect dayg0555/system-info-library:latest > /dev/null 2>&1; then
+          if timeout 30 docker manifest inspect dayg0555/system-info-library:latest > /dev/null 2>&1; then
             echo "✅ system-info-library: найден"
             OS_STATUS="success"
           else
@@ -104,15 +103,17 @@ jobs:
           # Создаем requirements.txt если его нет
           if [ ! -f requirements.txt ]; then
             echo "📝 Создаем requirements.txt..."
-            echo "psutil==5.9.8" > requirements.txt
-            echo "py-cpuinfo==9.0.0" >> requirements.txt
-            echo "psycopg2-binary==2.9.9" >> requirements.txt
+            cat > requirements.txt << EOF
+psutil==5.9.8
+py-cpuinfo==9.0.0
+psycopg2-binary==2.9.9
+EOF
           fi
           
           # Создаем main.py если его нет
           if [ ! -f main.py ]; then
             echo "📝 Создаем main.py..."
-            cat > main.py << EOF
+            cat > main.py << 'EOF'
 import sys
 import os
 from hardware_collector_lib.main import get_device_info
@@ -148,7 +149,7 @@ EOF
           fi
           
           # Создаем тестовый Dockerfile
-          cat > Dockerfile.test << EOF
+          cat > Dockerfile.test << 'EOF'
 FROM dayg0555/hardware_collector_lib:latest AS hw_lib
 FROM dayg0555/system-info-library:latest AS os_lib
 FROM python:3.11-slim
@@ -161,14 +162,14 @@ COPY --from=os_lib /app /app/system_info_library/
 
 # Устанавливаем зависимости
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \\
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Копируем основной код
 COPY main.py .
 
 # Устанавливаем PYTHONPATH
-ENV PYTHONPATH="/app:\${PYTHONPATH}"
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Проверяем импорты
 RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('✅ Обе библиотеки импортируются успешно')"
@@ -185,7 +186,7 @@ EOF
             
             # Запускаем контейнер для проверки
             echo "🚀 Запуск тестового контейнера..."
-            docker run --rm test-project python -c "
+            docker run --rm --timeout 60 test-project python -c "
 from hardware_collector_lib.main import get_device_info
 from system_info_library.main import get_system_info
 print('✅ Импорты работают')
