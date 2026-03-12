@@ -1,63 +1,27 @@
-# ==============================
-# Main Code with System Information Library
-# ==============================
-
-# Используем нашу библиотеку с Docker Hub как базовый образ
-FROM dayg0555/system-info-library:latest AS system-info-lib
-
-# Базовый образ для приложения
+# Multi-stage: копируем библиотеки из Docker Hub
+FROM dayg0555/hardware_collector_lib:latest as hw_lib
+FROM dayg0555/system-info-library:latest as os_lib
 FROM python:3.11-slim
 
-LABEL maintainer="dayg0555@gmail.com"
-LABEL description="Main application using System Information Library"
-LABEL version="1.0.0"
-
-# ------------------------------
-# Установка системных зависимостей
-# ------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pciutils \
-    usbutils \
-    && rm -rf /var/lib/apt/lists/*
-
-# ------------------------------
-# Рабочая директория
-# ------------------------------
 WORKDIR /app
 
-# ------------------------------
-# Копирование нашей библиотеки из предыдущего образа
-# ------------------------------
-COPY --from=system-info-lib /app /app/system_info_library/
+# Копируем КОД библиотек из Docker Hub образов
+COPY --from=hw_lib /app /app/hardware_collector_lib
+COPY --from=os_lib /app /app/system_info_library
 
-# ------------------------------
-# Устанавливаем Python путь
-# ------------------------------
-ENV PYTHONPATH="/app:${PYTHONPATH}"
-
-# ------------------------------
-# Копируем зависимости и код приложения
-# ------------------------------
+# Устанавливаем зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Копируем ваш main.py
 COPY main.py .
 
-# ------------------------------
-# Проверка импорта
-# ------------------------------
-RUN echo "=== Проверка импорта библиотеки ===" && \
-    python -c "from system_info_library.main import get_system_info; print('✅ Библиотека успешно импортируется')"
+# IMPORTANT: PYTHONPATH должен видеть библиотеки
+ENV PYTHONPATH=/app
 
-# ------------------------------
-# Создание непривилегированного пользователя
-# ------------------------------
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Проверяем импорты
+RUN python -c "from hardware_collector_lib.main import get_device_info; print('HW OK')" && \
+    python -c "from system_info_library.main import get_system_info; print('OS OK')"
 
-USER appuser
-
-# ------------------------------
-# Запуск приложения
-# ------------------------------
+EXPOSE 8000
 CMD ["python", "main.py"]
