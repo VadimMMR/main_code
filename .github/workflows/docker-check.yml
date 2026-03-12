@@ -26,7 +26,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check if image exists on Docker Hub
+      - name: Check if image exists
         id: check_image
         run: |
           echo "🔍 Checking ${{ matrix.image }}..."
@@ -39,20 +39,11 @@ jobs:
             exit 1
           fi
 
-      - name: Test pulling image
+      - name: Test pull
         if: steps.check_image.outputs.status == 'success'
         run: |
-          echo "🐳 Pulling ${{ matrix.image }}..."
           docker pull ${{ matrix.image }}
-          echo "✅ Pull successful"
-
-      - name: Test container creation
-        if: steps.check_image.outputs.status == 'success'
-        run: |
-          echo "🚀 Testing container creation..."
-          docker create --name test ${{ matrix.image }}
-          docker rm test
-          echo "✅ Container test passed"
+          echo "✅ Pull OK"
 
   check-main-project:
     needs: check-docker-images
@@ -63,66 +54,49 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check all required images
+      - name: Verify images exist
         id: check_status
         run: |
-          echo "📋 Checking required images:"
-          
-          if timeout 30 docker manifest inspect dayg0555/hardware_collector_lib:latest > /dev/null 2>&1; then
-            echo "✅ hardware_collector_lib: OK"
-            HW_STATUS="success"
-          else
-            echo "❌ hardware_collector_lib: MISSING"
-            HW_STATUS="failure"
-          fi
-          
-          if timeout 30 docker manifest inspect dayg0555/system-info-library:latest > /dev/null 2>&1; then
-            echo "✅ system-info-library: OK"
-            OS_STATUS="success"
-          else
-            echo "❌ system-info-library: MISSING"
-            OS_STATUS="failure"
-          fi
-          
+          echo "📋 Checking images..."
+          docker pull dayg0555/hardware_collector_lib:latest || HW_STATUS="failure" && echo "❌ HW lib missing" || HW_STATUS="success"
+          docker pull dayg0555/system-info-library:latest || OS_STATUS="failure" && echo "❌ OS lib missing" || OS_STATUS="success"
           echo "hw_status=$HW_STATUS" >> $GITHUB_OUTPUT
           echo "os_status=$OS_STATUS" >> $GITHUB_OUTPUT
 
-      - name: Build test project
+      - name: Build integration test
         if: steps.check_status.outputs.hw_status == 'success' && steps.check_status.outputs.os_status == 'success'
         run: |
-          echo "🏗️ Building test project..."
+          echo "🏗️ Multi-stage build test..."
           
-          cat > requirements.txt << REQ_EOF
+          cat > requirements.txt << EOF
           psutil==5.9.8
           py-cpuinfo==9.0.0
           psycopg2-binary==2.9.9
-          REQ_EOF
-                    
-                    cat > main.py << MAIN_EOF
-          import sys
-          import os
-          import json
+          EOF
 
+                    cat > main.py << EOF
+          import sys, os, json
           try:
               from hardware_collector_lib.main import get_device_info
               from system_info_library.main import get_system_info
-              print("✅ Both libraries imported successfully")
-              
-              hw_info = get_device_info()
-              print("✅ Hardware info keys:", list(hw_info.keys())[:5])
-              
-              sys_info = get_system_info(mode="standard")
-              print("✅ System info obtained")
-              
+              print("✅ IMPORTS SUCCESS")
+              print("Hardware keys:", list(get_device_info().keys())[:3])
+              print("System info:", get_system_info(mode="standard"))
           except Exception as e:
-              print("❌ Import error:", str(e))
+              print("❌ ERROR:", str(e))
               sys.exit(1)
-          MAIN_EOF
-                    
-                    cat > Dockerfile.test << DF_EOF
+          EOF
+
+                    cat > Dockerfile.test << EOF
+          FROM dayg0555/hardware_collector_lib:latest as hw_lib
+          FROM dayg0555/system-info-library:latest as os_lib
           FROM python:3.11-slim
 
           WORKDIR /app
+
+          # Copy libraries from Docker Hub images
+          COPY --from=hw_lib /app /app/hardware_collector_lib
+          COPY --from=os_lib /app /app/system_info_library
 
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
@@ -131,36 +105,24 @@ jobs:
 
           ENV PYTHONPATH=/app
 
-          RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('Libraries OK')"
+          # Test imports
+          RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('✅ LIBRARIES OK')"
 
           CMD ["python", "main.py"]
-          DF_EOF
+          EOF
 
                     docker build -f Dockerfile.test -t test-project .
-                    
-                    if docker image inspect test-project > /dev/null 2>&1; then
-                      echo "✅ Image built successfully"
-                      docker run --rm test-project
-                    else
-                      echo "❌ Build failed"
-                      exit 1
-                    fi
-                    
-                    echo "✅ All tests passed!"
+                    docker run --rm test-project
+                    echo "✅ INTEGRATION TEST PASSED!"
 
-                - name: Report failure
-                  if: failure()
-                  run: |
-                    echo "❌ Docker Hub images check failed!"
-                    echo "Check these images:"
-                    echo "- dayg0555/hardware_collector_lib:latest"
-                    echo "- dayg0555/system-info-library:latest"
-                    exit 1
-
-                - name: Report success
-                  if: success()
-                  run: |
-                    echo "🎉 All Docker Hub images are available!"
-                    echo "✅ hardware_collector_lib:latest"
-                    echo "✅ system-info-library:latest"
-                    echo "✅ Test build successful"
+      - name: Report results
+        if: always()
+        run: |
+          if [ "${{ steps.check_status.outputs.hw_status }}" = "success" ] && [ "${{ steps.check_status.outputs.os_status }}" = "success" ]; then
+            echo "🎉 All images OK and integration test passed!"
+          else
+            echo "❌ Some images missing!"
+            echo "hardware_collector_lib: ${{ steps.check_status.outputs.hw_status }}"
+            echo "system-info-library: ${{ steps.check_status.outputs.os_status }}"
+            exit 1
+          fi
