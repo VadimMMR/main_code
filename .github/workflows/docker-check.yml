@@ -16,7 +16,7 @@ jobs:
       matrix:
         image: [
           "dayg0555/hardware_collector_lib:latest",
-          "dayg0555/system_info_lib:latest"
+          "dayg0555/system-info-library:latest"
         ]
       fail-fast: false
     
@@ -62,6 +62,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check if all images are available
+        id: check_status
         run: |
           echo "📋 Проверка всех необходимых образов:"
           
@@ -74,12 +75,12 @@ jobs:
             HW_STATUS="failure"
           fi
           
-          # Проверяем system_info_lib
-          if docker manifest inspect dayg0555/system_info_lib:latest > /dev/null 2>&1; then
-            echo "✅ system_info_lib: найден"
+          # Проверяем system-info-library
+          if docker manifest inspect dayg0555/system-info-library:latest > /dev/null 2>&1; then
+            echo "✅ system-info-library: найден"
             OS_STATUS="success"
           else
-            echo "❌ system_info_lib: НЕ НАЙДЕН"
+            echo "❌ system-info-library: НЕ НАЙДЕН"
             OS_STATUS="failure"
           fi
           
@@ -90,18 +91,17 @@ jobs:
             echo "❌ КРИТИЧЕСКАЯ ОШИБКА: Ни один из образов не найден!"
             exit 1
           fi
-        id: check_status
 
       - name: Build main project (if all images available)
         if: steps.check_status.outputs.hw_status == 'success' && steps.check_status.outputs.os_status == 'success'
         run: |
           echo "🏗️ Все образы найдены! Сборка основного проекта..."
           echo "FROM dayg0555/hardware_collector_lib:latest AS hw_lib" > Dockerfile.test
-          echo "FROM dayg0555/system_info_lib:latest AS os_lib" >> Dockerfile.test
+          echo "FROM dayg0555/system-info-library:latest AS os_lib" >> Dockerfile.test
           echo "FROM python:3.11-slim" >> Dockerfile.test
           echo "WORKDIR /app" >> Dockerfile.test
           echo "COPY --from=hw_lib /app/ /app/hardware_collector_lib/" >> Dockerfile.test
-          echo "COPY --from=os_lib /app/ /app/system_info_lib/" >> Dockerfile.test
+          echo "COPY --from=os_lib /app/ /app/system_info_library/" >> Dockerfile.test
           echo "COPY requirements.txt ." >> Dockerfile.test
           echo "RUN pip install --no-cache-dir -r requirements.txt" >> Dockerfile.test
           echo "COPY main.py ." >> Dockerfile.test
@@ -120,7 +120,7 @@ jobs:
             echo "  - dayg0555/hardware_collector_lib:latest"
           fi
           if [ "${{ steps.check_status.outputs.os_status }}" = "failure" ]; then
-            echo "  - dayg0555/system_info_lib:latest"
+            echo "  - dayg0555/system-info-library:latest"
           fi
 
       - name: Send success notification
@@ -128,4 +128,4 @@ jobs:
         run: |
           echo "🎉 Все образы на Docker Hub доступны!"
           echo "hardware_collector_lib: ✅"
-          echo "system_info_lib: ✅"
+          echo "system-info-library: ✅"

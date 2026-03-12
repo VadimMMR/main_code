@@ -1,24 +1,63 @@
-FROM dayg0555/hardware_collector_lib:v3.0-final AS hardware_lib
-FROM dayg0555/system_info_lib:latest AS os_lib
+# ==============================
+# Main Code with System Information Library
+# ==============================
 
+# Используем нашу библиотеку с Docker Hub как базовый образ
+FROM dayg0555/system-info-library:latest AS system-info-lib
+
+# Базовый образ для приложения
 FROM python:3.11-slim
 
+LABEL maintainer="dayg0555@gmail.com"
+LABEL description="Main application using System Information Library"
+LABEL version="1.0.0"
+
+# ------------------------------
+# Установка системных зависимостей
+# ------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pciutils \
+    usbutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------
+# Рабочая директория
+# ------------------------------
 WORKDIR /app
 
-# Копируем библиотеку hardware
-COPY --from=hardware_lib /app/hardware_collector_lib/ /app/hardware_collector_lib/
+# ------------------------------
+# Копирование нашей библиотеки из предыдущего образа
+# ------------------------------
+COPY --from=system-info-lib /app /app/system_info_library/
 
-# Копируем библиотеку system_info_lib
-COPY --from=os_lib /app/ /app/system_info_lib/
+# ------------------------------
+# Устанавливаем Python путь
+# ------------------------------
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
-# Копируем зависимости
+# ------------------------------
+# Копируем зависимости и код приложения
+# ------------------------------
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем основной код
 COPY main.py .
 
-# Устанавливаем PYTHONPATH
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+# ------------------------------
+# Проверка импорта
+# ------------------------------
+RUN echo "=== Проверка импорта библиотеки ===" && \
+    python -c "from system_info_library.main import get_system_info; print('✅ Библиотека успешно импортируется')"
 
+# ------------------------------
+# Создание непривилегированного пользователя
+# ------------------------------
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# ------------------------------
+# Запуск приложения
+# ------------------------------
 CMD ["python", "main.py"]
