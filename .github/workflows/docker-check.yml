@@ -9,6 +9,10 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+# Добавляем переменную окружения для подавления предупреждений о Node.js
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check-docker-images:
     runs-on: ubuntu-latest
@@ -96,19 +100,108 @@ jobs:
         if: steps.check_status.outputs.hw_status == 'success' && steps.check_status.outputs.os_status == 'success'
         run: |
           echo "🏗️ Все образы найдены! Сборка основного проекта..."
-          echo "FROM dayg0555/hardware_collector_lib:latest AS hw_lib" > Dockerfile.test
-          echo "FROM dayg0555/system-info-library:latest AS os_lib" >> Dockerfile.test
-          echo "FROM python:3.11-slim" >> Dockerfile.test
-          echo "WORKDIR /app" >> Dockerfile.test
-          echo "COPY --from=hw_lib /app/ /app/hardware_collector_lib/" >> Dockerfile.test
-          echo "COPY --from=os_lib /app/ /app/system_info_library/" >> Dockerfile.test
-          echo "COPY requirements.txt ." >> Dockerfile.test
-          echo "RUN pip install --no-cache-dir -r requirements.txt" >> Dockerfile.test
-          echo "COPY main.py ." >> Dockerfile.test
-          echo "ENV PYTHONPATH=/app" >> Dockerfile.test
-          echo "CMD [\"python\", \"main.py\"]" >> Dockerfile.test
           
+          # Создаем requirements.txt если его нет
+          if [ ! -f requirements.txt ]; then
+            echo "📝 Создаем requirements.txt..."
+            cat > requirements.txt << 'EOF'
+psutil==5.9.8
+py-cpuinfo==9.0.0
+psycopg2-binary==2.9.9
+EOF
+          fi
+          
+          # Создаем main.py если его нет
+          if [ ! -f main.py ]; then
+            echo "📝 Создаем main.py..."
+            cat > main.py << 'EOF'
+import sys
+import os
+from hardware_collector_lib.main import get_device_info
+import json
+from system_info_library.main import get_system_info
+
+def get_info_device():
+    all_info = get_device_info()
+    print(json.dumps(all_info, indent=2, default=str))
+
+def get_info_os_standart():
+    system_info = get_system_info(mode="standard")
+    if hasattr(system_info, 'to_dict'):
+        print(json.dumps(system_info.to_dict(), indent=2, default=str))
+    else:
+        print(json.dumps(system_info, indent=2, default=str))
+
+def get_info_os_advanced():
+    system_info = get_system_info(mode="advanced")
+    if hasattr(system_info, 'to_flat_dict'):
+        print(json.dumps(system_info.to_flat_dict(), indent=2, default=str))
+    elif hasattr(system_info, 'to_dict'):
+        print(json.dumps(system_info.to_dict(), indent=2, default=str))
+    else:
+        print(json.dumps(system_info, indent=2, default=str))
+
+if __name__ == "__main__":
+    print("=== Hardware Info ===")
+    get_info_device()
+    print("\n=== OS Info (Standard) ===")
+    get_info_os_standart()
+EOF
+          fi
+          
+          # Создаем тестовый Dockerfile
+          cat > Dockerfile.test << 'EOF'
+FROM dayg0555/hardware_collector_lib:latest AS hw_lib
+FROM dayg0555/system-info-library:latest AS os_lib
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Копируем библиотеки
+COPY --from=hw_lib /app /app/hardware_collector_lib/
+COPY --from=os_lib /app /app/system_info_library/
+
+# Устанавливаем зависимости
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копируем основной код
+COPY main.py .
+
+# Устанавливаем PYTHONPATH
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Проверяем импорты
+RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('✅ Обе библиотеки импортируются успешно')"
+
+CMD ["python", "main.py"]
+EOF
+
+          # Собираем образ
           docker build -f Dockerfile.test -t test-project .
+          
+          # Проверяем, что образ создан
+          if docker image inspect test-project > /dev/null 2>&1; then
+            echo "✅ Образ test-project успешно создан!"
+            
+            # Запускаем контейнер для проверки
+            echo "🚀 Запуск тестового контейнера..."
+            docker run --rm test-project python -c "
+from hardware_collector_lib.main import get_device_info
+from system_info_library.main import get_system_info
+print('✅ Импорты работают')
+hw = get_device_info()
+print(f'✅ Hardware info получена: {list(hw.keys())}')
+os_info = get_system_info('standard')
+print(f'✅ OS info получена')
+print('🎉 Все проверки пройдены!')
+"
+          else:
+            echo "❌ Ошибка: образ не создан"
+            exit 1
+          fi
+          
           echo "✅ Пробная сборка прошла успешно!"
 
       - name: Send notification on failure
@@ -122,6 +215,7 @@ jobs:
           if [ "${{ steps.check_status.outputs.os_status }}" = "failure" ]; then
             echo "  - dayg0555/system-info-library:latest"
           fi
+          exit 1
 
       - name: Send success notification
         if: success()
@@ -129,3 +223,4 @@ jobs:
           echo "🎉 Все образы на Docker Hub доступны!"
           echo "hardware_collector_lib: ✅"
           echo "system-info-library: ✅"
+          echo "Тестовая сборка проекта: ✅"
