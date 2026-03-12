@@ -104,17 +104,15 @@ jobs:
           # Создаем requirements.txt если его нет
           if [ ! -f requirements.txt ]; then
             echo "📝 Создаем requirements.txt..."
-            cat > requirements.txt << 'EOF'
-psutil==5.9.8
-py-cpuinfo==9.0.0
-psycopg2-binary==2.9.9
-EOF
+            echo "psutil==5.9.8" > requirements.txt
+            echo "py-cpuinfo==9.0.0" >> requirements.txt
+            echo "psycopg2-binary==2.9.9" >> requirements.txt
           fi
           
           # Создаем main.py если его нет
           if [ ! -f main.py ]; then
             echo "📝 Создаем main.py..."
-            cat > main.py << 'EOF'
+            cat > main.py << EOF
 import sys
 import os
 from hardware_collector_lib.main import get_device_info
@@ -150,7 +148,7 @@ EOF
           fi
           
           # Создаем тестовый Dockerfile
-          cat > Dockerfile.test << 'EOF'
+          cat > Dockerfile.test << EOF
 FROM dayg0555/hardware_collector_lib:latest AS hw_lib
 FROM dayg0555/system-info-library:latest AS os_lib
 FROM python:3.11-slim
@@ -163,14 +161,14 @@ COPY --from=os_lib /app /app/system_info_library/
 
 # Устанавливаем зависимости
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip && \\
     pip install --no-cache-dir -r requirements.txt
 
 # Копируем основной код
 COPY main.py .
 
 # Устанавливаем PYTHONPATH
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+ENV PYTHONPATH="/app:\${PYTHONPATH}"
 
 # Проверяем импорты
 RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('✅ Обе библиотеки импортируются успешно')"
@@ -197,7 +195,7 @@ os_info = get_system_info('standard')
 print(f'✅ OS info получена')
 print('🎉 Все проверки пройдены!')
 "
-          else:
+          else
             echo "❌ Ошибка: образ не создан"
             exit 1
           fi
