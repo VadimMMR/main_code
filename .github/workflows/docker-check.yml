@@ -17,209 +17,150 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image: [
-          "dayg0555/hardware_collector_lib:latest",
-          "dayg0555/system-info-library:latest"
-        ]
+        image: 
+          - "dayg0555/hardware_collector_lib:latest"
+          - "dayg0555/system-info-library:latest"
       fail-fast: false
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check if ${{ matrix.image }} exists on Docker Hub
+      - name: Check if image exists on Docker Hub
         id: check_image
         run: |
-          echo "🔍 Проверка образа ${{ matrix.image }}..."
+          echo "🔍 Checking ${{ matrix.image }}..."
           if timeout 30 docker manifest inspect ${{ matrix.image }} > /dev/null 2>&1; then
-            echo "✅ Образ ${{ matrix.image }} существует!"
+            echo "✅ Image exists"
             echo "status=success" >> $GITHUB_OUTPUT
           else
-            echo "❌ Образ ${{ matrix.image }} не найден!"
+            echo "❌ Image not found"
             echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-      - name: Test pulling ${{ matrix.image }}
+      - name: Test pulling image
         if: steps.check_image.outputs.status == 'success'
         run: |
-          echo "🐳 Тестовый pull образа ${{ matrix.image }}..."
+          echo "🐳 Pulling ${{ matrix.image }}..."
           docker pull ${{ matrix.image }}
-          echo "✅ Образ успешно скачан"
+          echo "✅ Pull successful"
 
-      - name: Create test container from ${{ matrix.image }}
+      - name: Test container creation
         if: steps.check_image.outputs.status == 'success'
         run: |
-          echo "🚀 Создание тестового контейнера из ${{ matrix.image }}..."
+          echo "🚀 Testing container creation..."
           docker create --name test ${{ matrix.image }}
           docker rm test
-          echo "✅ Контейнер успешно создан"
+          echo "✅ Container test passed"
 
   check-main-project:
     needs: check-docker-images
     runs-on: ubuntu-latest
-    if: always()  # Запускать всегда, независимо от успеха/неудачи предыдущих job
+    if: always()
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check if all images are available
+      - name: Check all required images
         id: check_status
         run: |
-          echo "📋 Проверка всех необходимых образов:"
+          echo "📋 Checking required images:"
           
-          # Проверяем hardware_collector_lib
           if timeout 30 docker manifest inspect dayg0555/hardware_collector_lib:latest > /dev/null 2>&1; then
-            echo "✅ hardware_collector_lib: найден"
+            echo "✅ hardware_collector_lib: OK"
             HW_STATUS="success"
           else
-            echo "❌ hardware_collector_lib: НЕ НАЙДЕН"
+            echo "❌ hardware_collector_lib: MISSING"
             HW_STATUS="failure"
           fi
           
-          # Проверяем system-info-library
           if timeout 30 docker manifest inspect dayg0555/system-info-library:latest > /dev/null 2>&1; then
-            echo "✅ system-info-library: найден"
+            echo "✅ system-info-library: OK"
             OS_STATUS="success"
           else
-            echo "❌ system-info-library: НЕ НАЙДЕН"
+            echo "❌ system-info-library: MISSING"
             OS_STATUS="failure"
           fi
           
           echo "hw_status=$HW_STATUS" >> $GITHUB_OUTPUT
           echo "os_status=$OS_STATUS" >> $GITHUB_OUTPUT
-          
-          if [ "$HW_STATUS" = "failure" ] && [ "$OS_STATUS" = "failure" ]; then
-            echo "❌ КРИТИЧЕСКАЯ ОШИБКА: Ни один из образов не найден!"
-            exit 1
-          fi
 
-      - name: Build main project (if all images available)
+      - name: Build test project
         if: steps.check_status.outputs.hw_status == 'success' && steps.check_status.outputs.os_status == 'success'
         run: |
-          echo "🏗️ Все образы найдены! Сборка основного проекта..."
+          echo "🏗️ Building test project..."
           
-          # Создаем requirements.txt если его нет
-          if [ ! -f requirements.txt ]; then
-            echo "📝 Создаем requirements.txt..."
-            cat > requirements.txt << EOF
-psutil==5.9.8
-py-cpuinfo==9.0.0
-psycopg2-binary==2.9.9
-EOF
-          fi
-          
-          # Создаем main.py если его нет
-          if [ ! -f main.py ]; then
-            echo "📝 Создаем main.py..."
-            cat > main.py << 'EOF'
-import sys
-import os
-from hardware_collector_lib.main import get_device_info
-import json
-from system_info_library.main import get_system_info
+          cat > requirements.txt << REQ_EOF
+          psutil==5.9.8
+          py-cpuinfo==9.0.0
+          psycopg2-binary==2.9.9
+          REQ_EOF
+                    
+                    cat > main.py << MAIN_EOF
+          import sys
+          import os
+          import json
 
-def get_info_device():
-    all_info = get_device_info()
-    print(json.dumps(all_info, indent=2, default=str))
+          try:
+              from hardware_collector_lib.main import get_device_info
+              from system_info_library.main import get_system_info
+              print("✅ Both libraries imported successfully")
+              
+              hw_info = get_device_info()
+              print("✅ Hardware info keys:", list(hw_info.keys())[:5])
+              
+              sys_info = get_system_info(mode="standard")
+              print("✅ System info obtained")
+              
+          except Exception as e:
+              print("❌ Import error:", str(e))
+              sys.exit(1)
+          MAIN_EOF
+                    
+                    cat > Dockerfile.test << DF_EOF
+          FROM python:3.11-slim
 
-def get_info_os_standart():
-    system_info = get_system_info(mode="standard")
-    if hasattr(system_info, 'to_dict'):
-        print(json.dumps(system_info.to_dict(), indent=2, default=str))
-    else:
-        print(json.dumps(system_info, indent=2, default=str))
+          WORKDIR /app
 
-def get_info_os_advanced():
-    system_info = get_system_info(mode="advanced")
-    if hasattr(system_info, 'to_flat_dict'):
-        print(json.dumps(system_info.to_flat_dict(), indent=2, default=str))
-    elif hasattr(system_info, 'to_dict'):
-        print(json.dumps(system_info.to_dict(), indent=2, default=str))
-    else:
-        print(json.dumps(system_info, indent=2, default=str))
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
 
-if __name__ == "__main__":
-    print("=== Hardware Info ===")
-    get_info_device()
-    print("\n=== OS Info (Standard) ===")
-    get_info_os_standart()
-EOF
-          fi
-          
-          # Создаем тестовый Dockerfile
-          cat > Dockerfile.test << 'EOF'
-FROM dayg0555/hardware_collector_lib:latest AS hw_lib
-FROM dayg0555/system-info-library:latest AS os_lib
-FROM python:3.11-slim
+          COPY main.py .
 
-WORKDIR /app
+          ENV PYTHONPATH=/app
 
-# Копируем библиотеки
-COPY --from=hw_lib /app /app/hardware_collector_lib/
-COPY --from=os_lib /app /app/system_info_library/
+          RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('Libraries OK')"
 
-# Устанавливаем зависимости
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+          CMD ["python", "main.py"]
+          DF_EOF
 
-# Копируем основной код
-COPY main.py .
+                    docker build -f Dockerfile.test -t test-project .
+                    
+                    if docker image inspect test-project > /dev/null 2>&1; then
+                      echo "✅ Image built successfully"
+                      docker run --rm test-project
+                    else
+                      echo "❌ Build failed"
+                      exit 1
+                    fi
+                    
+                    echo "✅ All tests passed!"
 
-# Устанавливаем PYTHONPATH
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+                - name: Report failure
+                  if: failure()
+                  run: |
+                    echo "❌ Docker Hub images check failed!"
+                    echo "Check these images:"
+                    echo "- dayg0555/hardware_collector_lib:latest"
+                    echo "- dayg0555/system-info-library:latest"
+                    exit 1
 
-# Проверяем импорты
-RUN python -c "from hardware_collector_lib.main import get_device_info; from system_info_library.main import get_system_info; print('✅ Обе библиотеки импортируются успешно')"
-
-CMD ["python", "main.py"]
-EOF
-
-          # Собираем образ
-          docker build -f Dockerfile.test -t test-project .
-          
-          # Проверяем, что образ создан
-          if docker image inspect test-project > /dev/null 2>&1; then
-            echo "✅ Образ test-project успешно создан!"
-            
-            # Запускаем контейнер для проверки
-            echo "🚀 Запуск тестового контейнера..."
-            docker run --rm --timeout 60 test-project python -c "
-from hardware_collector_lib.main import get_device_info
-from system_info_library.main import get_system_info
-print('✅ Импорты работают')
-hw = get_device_info()
-print(f'✅ Hardware info получена: {list(hw.keys())}')
-os_info = get_system_info('standard')
-print(f'✅ OS info получена')
-print('🎉 Все проверки пройдены!')
-"
-          else
-            echo "❌ Ошибка: образ не создан"
-            exit 1
-          fi
-          
-          echo "✅ Пробная сборка прошла успешно!"
-
-      - name: Send notification on failure
-        if: failure()
-        run: |
-          echo "⚠️ ВНИМАНИЕ! Проблемы с образами на Docker Hub!"
-          echo "Проверьте следующие образы:"
-          if [ "${{ steps.check_status.outputs.hw_status }}" = "failure" ]; then
-            echo "  - dayg0555/hardware_collector_lib:latest"
-          fi
-          if [ "${{ steps.check_status.outputs.os_status }}" = "failure" ]; then
-            echo "  - dayg0555/system-info-library:latest"
-          fi
-          exit 1
-
-      - name: Send success notification
-        if: success()
-        run: |
-          echo "🎉 Все образы на Docker Hub доступны!"
-          echo "hardware_collector_lib: ✅"
-          echo "system-info-library: ✅"
-          echo "Тестовая сборка проекта: ✅"
+                - name: Report success
+                  if: success()
+                  run: |
+                    echo "🎉 All Docker Hub images are available!"
+                    echo "✅ hardware_collector_lib:latest"
+                    echo "✅ system-info-library:latest"
+                    echo "✅ Test build successful"
