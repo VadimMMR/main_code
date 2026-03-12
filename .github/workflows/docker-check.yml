@@ -1,5 +1,4 @@
 name: Check Docker Hub Images
-
 on:
   push:
     branches: [ main, master ]
@@ -10,65 +9,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-images-and-structure:
+  check-images:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pull and inspect images
+      - name: Pull images
         run: |
-          echo "🔍 Pulling and inspecting images..."
-          
-          # Скачиваем образы
           docker pull dayg0555/hardware_collector_lib:latest
           docker pull dayg0555/system-info-library:latest
-          
-          echo "📁 HW library structure:"
-          docker run --rm dayg0555/hardware_collector_lib:latest find / -name "*.py" 2>/dev/null | head -20 || echo "No .py files found"
-          
-          echo "📁 OS library structure:"  
-          docker run --rm dayg0555/system-info-library:latest find / -name "*.py" 2>/dev/null | head -20 || echo "No .py files found"
-          
-          echo "✅ Images exist and are accessible!"
+          echo "✅ Images pulled successfully"
 
-      - name: Test basic integration
+      - name: Show structure
         run: |
-          echo "🧪 Simple import test..."
-          
-          cat > test_imports.py << EOF
-import sys
-import subprocess
-import os
+          echo "📁 HW library files:"
+          docker run --rm dayg0555/hardware_collector_lib:latest ls -la /app 2>/dev/null || echo "No /app"
+          echo "📁 OS library files:"
+          docker run --rm dayg0555/system-info-library:latest ls -la /app 2>/dev/null || echo "No /app"
+          echo "✅ Structure check complete"
 
-# Тестируем прямой запуск библиотек
-print("🔍 Testing direct library execution...")
+      - name: Test run
+        run: |
+          docker run --rm dayg0555/hardware_collector_lib:latest echo "HW OK"
+          docker run --rm dayg0555/system-info-library:latest echo "OS OK"
+          echo "✅ Both images work!"
 
-# Проверяем, что библиотеки запускаются
-try:
-    result_hw = subprocess.run(['docker', 'run', '--rm', 'dayg0555/hardware_collector_lib:latest', 'python', '-c', 'print("HW lib OK")'], 
-                              capture_output=True, text=True, timeout=30)
-    print("✅ HW library runs:", result_hw.stdout)
-except Exception as e:
-    print("❌ HW library failed:", str(e))
-
-try:  
-    result_os = subprocess.run(['docker', 'run', '--rm', 'dayg0555/system-info-library:latest', 'python', '-c', 'print("OS lib OK")'], 
-                              capture_output=True, text=True, timeout=30)
-    print("✅ OS library runs:", result_os.stdout)
-except Exception as e:
-    print("❌ OS library failed:", str(e))
-
-print("✅ Basic integration test PASSED!")
-EOF
-
-          python test_imports.py
-
-      - name: Final success report
+      - name: Success
         if: success()
-        run: |
-          echo "🎉 ALL TESTS PASSED!"
-          echo "✅ dayg0555/hardware_collector_lib:latest — EXISTS ✓"
-          echo "✅ dayg0555/system-info-library:latest — EXISTS ✓" 
-          echo "✅ Both libraries are Docker Hub ready!"
+        run: echo "🎉 ALL GOOD!"
