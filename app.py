@@ -14,7 +14,7 @@ CORS(app)
 
 # Конфигурация Telegram бота
 TELEGRAM_BOT_TOKEN = "8667089058:AAGpW3MM9GE3RDDtG6d33FJoQLPqmrAmgVc"
-TELEGRAM_CHAT_ID = "8667089058"  # Это ваш chat_id (обычно это тот же ID, что и в токене)
+TELEGRAM_CHAT_ID = "7404687267"  # Это ваш chat_id (обычно это тот же ID, что и в токене)
 
 # Глобальная переменная для хранения последних результатов
 latest_results = {
