@@ -2,6 +2,7 @@ import os
 import json
 import threading
 import time
+import requests
 from datetime import datetime
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -11,6 +12,10 @@ from system_info_library.main import get_system_info
 app = Flask(__name__)
 CORS(app)
 
+# Конфигурация Telegram бота
+TELEGRAM_BOT_TOKEN = "8667089058:AAGpW3MM9GE3RDDtG6d33FJoQLPqmrAmgVc"
+TELEGRAM_CHAT_ID = "8667089058"  # Это ваш chat_id (обычно это тот же ID, что и в токене)
+
 # Глобальная переменная для хранения последних результатов
 latest_results = {
     'hardware': None,
@@ -19,42 +24,94 @@ latest_results = {
     'last_update': None
 }
 
-def print_data_sample(data, title, max_items=15, max_str_length=200):
-    """Выводит образец данных в читаемом формате"""
-    print(f"\n📊 {title}:")
+def send_telegram_message(message):
+    """Отправляет сообщение в Telegram бот"""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            'chat_id': TELEGRAM_CHAT_ID,
+            'text': message,
+            'parse_mode': 'HTML'
+        }
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print(f"  📱 Telegram: сообщение отправлено")
+        else:
+            print(f"  ⚠️ Telegram: ошибка {response.status_code}")
+    except Exception as e:
+        print(f"  ⚠️ Telegram: ошибка отправки - {e}")
+
+def format_hardware_for_telegram(hw_data):
+    """Форматирует данные оборудования для Telegram"""
+    if not hw_data or isinstance(hw_data, dict) and 'error' in hw_data:
+        return "❌ Данные оборудования недоступны"
     
-    if isinstance(data, dict):
-        items_printed = 0
-        for key, value in data.items():
-            if items_printed >= max_items:
-                print(f"  ... и еще {len(data) - max_items} полей")
-                break
-            
-            if isinstance(value, (dict, list)):
-                value_str = json.dumps(value, ensure_ascii=False)[:max_str_length]
-                if len(json.dumps(value, ensure_ascii=False)) > max_str_length:
-                    value_str += "..."
-                print(f"  • {key}: {value_str}")
-            else:
-                value_str = str(value)[:max_str_length]
-                if len(str(value)) > max_str_length:
-                    value_str += "..."
-                print(f"  • {key}: {value_str}")
-            items_printed += 1
-    elif isinstance(data, list):
-        print(f"  Список из {len(data)} элементов:")
-        for i, item in enumerate(data[:5]):
-            item_str = json.dumps(item, ensure_ascii=False)[:max_str_length]
-            if len(json.dumps(item, ensure_ascii=False)) > max_str_length:
-                item_str += "..."
-            print(f"    [{i}] {item_str}")
-        if len(data) > 5:
-            print(f"    ... и еще {len(data) - 5} элементов")
-    else:
-        print(f"  {data}")
+    message = "🖥 <b>HARDWARE INFO</b>\n"
+    message += "═══════════════════\n"
+    
+    if isinstance(hw_data, dict):
+        # CPU информация
+        message += f"💻 CPU: {hw_data.get('cpu_model', 'N/A')}\n"
+        message += f"   Ядра: {hw_data.get('cpu_cores', 'N/A')} | Потоки: {hw_data.get('cpu_threads', 'N/A')}\n"
+        message += f"   L3 кэш: {hw_data.get('cpu_L3_MB', 'N/A')} MB\n"
+        message += f"   AVX2: {'✅' if hw_data.get('cpu_avx2') else '❌'}\n"
+        
+        # GPU информация
+        message += f"🎮 GPU: {hw_data.get('gpu_model', 'N/A')}\n"
+        
+        # RAM информация (если есть)
+        if 'ram_total_GB' in hw_data:
+            message += f"🧠 RAM: {hw_data.get('ram_total_GB', 'N/A')} GB\n"
+    
+    return message
+
+def format_os_for_telegram(os_data, mode="standard"):
+    """Форматирует данные ОС для Telegram"""
+    if not os_data or isinstance(os_data, dict) and 'error' in os_data:
+        return f"❌ Данные ОС ({mode}) недоступны"
+    
+    if mode == "standard" and isinstance(os_data, dict):
+        message = f"💿 <b>OS INFO ({mode.upper()})</b>\n"
+        message += "═══════════════════\n"
+        
+        if 'os_info' in os_data and isinstance(os_data['os_info'], dict):
+            os_info = os_data['os_info']
+            message += f"📀 ОС: {os_info.get('os_name', 'N/A')}\n"
+            message += f"   Версия: {os_info.get('os_version', 'N/A')}\n"
+            message += f"   Редакция: {os_info.get('os_edition', 'N/A')}\n"
+            message += f"   Архитектура: {os_info.get('os_architecture_bits', 'N/A')}bit\n"
+            message += f"   Ядро: {os_info.get('os_kernel', 'N/A')[:50]}...\n"
+            message += f"   Хост: {os_info.get('os_hostname', 'N/A')}\n"
+            message += f"   Uptime: {os_info.get('os_uptime_formatted', 'N/A')}\n"
+        
+        return message
+    
+    elif mode == "advanced" and isinstance(os_data, dict):
+        message = f"⚙️ <b>OS INFO ({mode.upper()})</b>\n"
+        message += "═══════════════════\n"
+        
+        # Основная информация
+        message += f"📀 ОС: {os_data.get('os.os_name', 'N/A')}\n"
+        message += f"   Версия: {os_data.get('os.os_version', 'N/A')}\n"
+        message += f"   Редакция: {os_data.get('os.os_edition', 'N/A')}\n"
+        message += f"   Ядро: {os_data.get('os.os_kernel', 'N/A')[:50]}...\n"
+        message += f"   Хост: {os_data.get('os.os_hostname', 'N/A')}\n"
+        message += f"   Uptime: {os_data.get('os.os_uptime_formatted', 'N/A')}\n"
+        
+        # Железо (если есть в advanced)
+        if 'hardware.cpu.model' in os_data:
+            message += f"💻 CPU: {os_data.get('hardware.cpu.model', 'N/A')}\n"
+            message += f"   Ядра: {os_data.get('hardware.cpu.cores', 'N/A')}\n"
+        
+        if 'hardware.memory.total_gb' in os_data:
+            message += f"🧠 RAM: {os_data.get('hardware.memory.total_gb', 'N/A')} GB\n"
+        
+        return message
+    
+    return f"❌ Неизвестный формат данных ({mode})"
 
 def collect_and_save_data():
-    """Собирает данные и сохраняет их в файл и в память"""
+    """Собирает данные, сохраняет их в файл и в память, выводит значения и отправляет в Telegram"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"system_data_{timestamp}.json"
     
@@ -69,6 +126,7 @@ def collect_and_save_data():
     print(f"{'='*70}")
     
     # Собираем hardware info
+    hw_data = None
     try:
         hw_data = get_device_info()
         results['data']['hardware'] = hw_data
@@ -81,6 +139,7 @@ def collect_and_save_data():
         print(f"  ❌ Hardware info: {e}")
     
     # Собираем OS standard
+    std_dict = None
     try:
         std_data = get_system_info(mode="standard")
         if hasattr(std_data, 'to_dict'):
@@ -105,6 +164,7 @@ def collect_and_save_data():
         print(f"  ❌ OS standard: {e}")
     
     # Собираем OS advanced
+    adv_dict = None
     try:
         adv_data = get_system_info(mode="advanced")
         if hasattr(adv_data, 'to_flat_dict'):
@@ -157,11 +217,70 @@ def collect_and_save_data():
     except Exception as e:
         print(f"  ❌ Ошибка истории: {e}")
     
+    # ОТПРАВЛЯЕМ В TELEGRAM
+    print(f"\n  📱 Отправка в Telegram...")
+    
+    # Формируем сообщение для Telegram
+    tg_message = f"<b>🔔 СБОР ДАННЫХ</b>\n"
+    tg_message += f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    
+    # Добавляем hardware информацию
+    if hw_data and not isinstance(hw_data, dict) or 'error' not in hw_data:
+        tg_message += format_hardware_for_telegram(hw_data) + "\n"
+    
+    # Добавляем OS standard информацию
+    if std_dict and not isinstance(std_dict, dict) or 'error' not in std_dict:
+        tg_message += format_os_for_telegram(std_dict, "standard") + "\n"
+    
+    # Добавляем OS advanced информацию (кратко)
+    if adv_dict and not isinstance(adv_dict, dict) or 'error' not in adv_dict:
+        tg_message += format_os_for_telegram(adv_dict, "advanced") + "\n"
+    
+    # Добавляем информацию о сохранении
+    tg_message += f"📁 Файл: {filename}\n"
+    tg_message += f"💾 История: {len(history)} записей"
+    
+    # Отправляем
+    send_telegram_message(tg_message)
+    
     latest_results['last_update'] = results['datetime']
     print(f"{'='*70}\n")
     
-    # Возвращаем True для индикации успеха
     return True
+
+def print_data_sample(data, title, max_items=15, max_str_length=200):
+    """Выводит образец данных в читаемом формате"""
+    print(f"\n📊 {title}:")
+    
+    if isinstance(data, dict):
+        items_printed = 0
+        for key, value in data.items():
+            if items_printed >= max_items:
+                print(f"  ... и еще {len(data) - max_items} полей")
+                break
+            
+            if isinstance(value, (dict, list)):
+                value_str = json.dumps(value, ensure_ascii=False)[:max_str_length]
+                if len(json.dumps(value, ensure_ascii=False)) > max_str_length:
+                    value_str += "..."
+                print(f"  • {key}: {value_str}")
+            else:
+                value_str = str(value)[:max_str_length]
+                if len(str(value)) > max_str_length:
+                    value_str += "..."
+                print(f"  • {key}: {value_str}")
+            items_printed += 1
+    elif isinstance(data, list):
+        print(f"  Список из {len(data)} элементов:")
+        for i, item in enumerate(data[:5]):
+            item_str = json.dumps(item, ensure_ascii=False)[:max_str_length]
+            if len(json.dumps(item, ensure_ascii=False)) > max_str_length:
+                item_str += "..."
+            print(f"    [{i}] {item_str}")
+        if len(data) > 5:
+            print(f"    ... и еще {len(data) - 5} элементов")
+    else:
+        print(f"  {data}")
 
 def periodic_collection(interval_minutes=20):
     """Запускает сбор данных с заданным интервалом"""
@@ -169,22 +288,18 @@ def periodic_collection(interval_minutes=20):
     
     while True:
         try:
-            # Ждем указанное количество минут
             next_time = datetime.now().timestamp() + (interval_minutes * 60)
             next_time_str = datetime.fromtimestamp(next_time).strftime('%H:%M:%S')
             print(f"⏳ Следующий сбор в {next_time_str} (через {interval_minutes} минут)")
             
-            # СПИМ указанное время
             time.sleep(interval_minutes * 60)
             
-            # После сна выполняем сбор
             print(f"⏰ Пробуждение: начинаю сбор данных...")
             collect_and_save_data()
             
         except Exception as e:
             print(f"❌ Ошибка в periodic_collection: {e}")
-            # В случае ошибки все равно ждем и пробуем снова
-            time.sleep(60)  # Подождем минуту и попробуем снова
+            time.sleep(60)
 
 # [Все routes остаются без изменений]
 @app.route('/')
