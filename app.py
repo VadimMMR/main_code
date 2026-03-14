@@ -30,7 +30,6 @@ def print_data_sample(data, title, max_items=15, max_str_length=200):
                 print(f"  ... и еще {len(data) - max_items} полей")
                 break
             
-            # Форматируем значение в зависимости от типа
             if isinstance(value, (dict, list)):
                 value_str = json.dumps(value, ensure_ascii=False)[:max_str_length]
                 if len(json.dumps(value, ensure_ascii=False)) > max_str_length:
@@ -41,24 +40,21 @@ def print_data_sample(data, title, max_items=15, max_str_length=200):
                 if len(str(value)) > max_str_length:
                     value_str += "..."
                 print(f"  • {key}: {value_str}")
-            
             items_printed += 1
-    
     elif isinstance(data, list):
         print(f"  Список из {len(data)} элементов:")
-        for i, item in enumerate(data[:5]):  # Первые 5 элементов
+        for i, item in enumerate(data[:5]):
             item_str = json.dumps(item, ensure_ascii=False)[:max_str_length]
             if len(json.dumps(item, ensure_ascii=False)) > max_str_length:
                 item_str += "..."
             print(f"    [{i}] {item_str}")
         if len(data) > 5:
             print(f"    ... и еще {len(data) - 5} элементов")
-    
     else:
         print(f"  {data}")
 
 def collect_and_save_data():
-    """Собирает данные, сохраняет их в файл и в память, выводит значения"""
+    """Собирает данные и сохраняет их в файл и в память"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"system_data_{timestamp}.json"
     
@@ -77,10 +73,9 @@ def collect_and_save_data():
         hw_data = get_device_info()
         results['data']['hardware'] = hw_data
         latest_results['hardware'] = hw_data
-        print(f"\n📱 HARDWARE INFO (/api/device):")
-        print(f"  ✅ Успешно собрано")
+        print(f"\n📱 HARDWARE INFO:")
         print_data_sample(hw_data, "Данные оборудования", max_items=10)
-        print(f"  📏 Полный размер: {len(str(hw_data))} символов")
+        print(f"  📏 Размер: {len(str(hw_data))} символов")
     except Exception as e:
         results['data']['hardware'] = {'error': str(e)}
         print(f"  ❌ Hardware info: {e}")
@@ -95,22 +90,16 @@ def collect_and_save_data():
         results['data']['os_standard'] = std_dict
         latest_results['os_standard'] = std_dict
         
-        print(f"\n💻 OS STANDARD (/api/os/standard):")
-        print(f"  ✅ Успешно собрано")
-        
-        # Выводим структуру данных
+        print(f"\n💻 OS STANDARD:")
         if isinstance(std_dict, dict):
-            print(f"  📋 Структура данных:")
-            for key, value in std_dict.items():
+            print(f"  📋 Структура:")
+            for key, value in list(std_dict.items())[:5]:
                 if isinstance(value, dict):
                     print(f"    • {key}: {list(value.keys())}")
-                elif isinstance(value, list):
-                    print(f"    • {key}: список из {len(value)} элементов")
                 else:
                     print(f"    • {key}: {type(value).__name__}")
-        
-        print_data_sample(std_dict, "Примеры значений", max_items=15)
-        print(f"  📏 Полный размер: {len(str(std_dict))} символов")
+        print_data_sample(std_dict, "Значения", max_items=10)
+        print(f"  📏 Размер: {len(str(std_dict))} символов")
     except Exception as e:
         results['data']['os_standard'] = {'error': str(e)}
         print(f"  ❌ OS standard: {e}")
@@ -125,38 +114,22 @@ def collect_and_save_data():
         results['data']['os_advanced'] = adv_dict
         latest_results['os_advanced'] = adv_dict
         
-        print(f"\n⚙️ OS ADVANCED (/api/os/advanced):")
-        print(f"  ✅ Успешно собрано")
-        
-        # Для advanced режима группируем по категориям
-        if isinstance(adv_dict, dict):
-            categories = {}
-            for key in adv_dict.keys():
-                category = key.split('_')[0] if '_' in key else 'other'
-                if category not in categories:
-                    categories[category] = []
-                categories[category].append(key)
-            
-            print(f"  📊 Категории данных:")
-            for category, keys in list(categories.items())[:8]:
-                print(f"    • {category}: {len(keys)} полей")
-        
-        print_data_sample(adv_dict, "Ключевые значения", max_items=20)
-        print(f"  📏 Полный размер: {len(str(adv_dict))} символов")
+        print(f"\n⚙️ OS ADVANCED:")
+        print_data_sample(adv_dict, "Значения", max_items=15)
+        print(f"  📏 Размер: {len(str(adv_dict))} символов")
     except Exception as e:
         results['data']['os_advanced'] = {'error': str(e)}
         print(f"  ❌ OS advanced: {e}")
     
-    # Сохраняем в файл с timestamp
+    # Сохраняем в файл
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False, default=str)
-        print(f"\n  💾 Сохранено в файл: {filename}")
-        print(f"  💾 Размер файла: {os.path.getsize(filename)} байт")
+        print(f"\n  💾 Сохранено: {filename}")
     except Exception as e:
-        print(f"  ❌ Ошибка сохранения файла: {e}")
+        print(f"  ❌ Ошибка сохранения: {e}")
     
-    # Сохраняем также в общий файл с историей
+    # Обновляем историю
     history_file = "data_history.json"
     try:
         history = []
@@ -164,8 +137,7 @@ def collect_and_save_data():
             with open(history_file, 'r', encoding='utf-8') as f:
                 history = json.load(f)
         
-        # Добавляем краткую информацию о сборе
-        summary = {
+        history.append({
             'timestamp': timestamp,
             'datetime': results['datetime'],
             'data_size': {
@@ -173,58 +145,48 @@ def collect_and_save_data():
                 'os_standard': len(str(results['data'].get('os_standard', ''))),
                 'os_advanced': len(str(results['data'].get('os_advanced', '')))
             }
-        }
+        })
         
-        # Добавляем ключевые значения для быстрого просмотра
-        if results['data'].get('hardware') and not isinstance(results['data']['hardware'], dict) or 'error' not in results['data']['hardware']:
-            hw = results['data']['hardware']
-            if isinstance(hw, dict):
-                summary['hardware_summary'] = {
-                    'cpu_model': hw.get('cpu', {}).get('model', 'N/A'),
-                    'cpu_cores': hw.get('cpu', {}).get('cores', 'N/A'),
-                    'ram_gb': hw.get('memory', {}).get('total_gb', 'N/A'),
-                    'disks_count': len(hw.get('disks', []))
-                }
-        
-        history.append(summary)
-        
-        # Оставляем только последние 100 записей
         if len(history) > 100:
             history = history[-100:]
         
         with open(history_file, 'w', encoding='utf-8') as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
         
-        print(f"  💾 История обновлена (всего записей: {len(history)})")
-        
-        # Показываем последние 3 записи из истории
-        print(f"\n  📜 Последние сборы:")
-        for entry in history[-3:]:
-            print(f"    • {entry['datetime']}: HW={entry['data_size']['hardware']} символов, "
-                  f"OSstd={entry['data_size']['os_standard']}, "
-                  f"OSadv={entry['data_size']['os_advanced']}")
-            
+        print(f"  💾 История: {len(history)} записей")
     except Exception as e:
-        print(f"  ❌ Ошибка обновления истории: {e}")
+        print(f"  ❌ Ошибка истории: {e}")
     
     latest_results['last_update'] = results['datetime']
-    print(f"\n{'='*70}\n")
+    print(f"{'='*70}\n")
+    
+    # Возвращаем True для индикации успеха
+    return True
 
 def periodic_collection(interval_minutes=20):
     """Запускает сбор данных с заданным интервалом"""
+    print(f"⏰ Поток сбора данных запущен с интервалом {interval_minutes} минут")
+    
     while True:
         try:
+            # Ждем указанное количество минут
+            next_time = datetime.now().timestamp() + (interval_minutes * 60)
+            next_time_str = datetime.fromtimestamp(next_time).strftime('%H:%M:%S')
+            print(f"⏳ Следующий сбор в {next_time_str} (через {interval_minutes} минут)")
+            
+            # СПИМ указанное время
+            time.sleep(interval_minutes * 60)
+            
+            # После сна выполняем сбор
+            print(f"⏰ Пробуждение: начинаю сбор данных...")
             collect_and_save_data()
+            
         except Exception as e:
-            print(f"❌ Критическая ошибка в periodic_collection: {e}")
-        
-        # Ждем указанное количество минут
-        next_collection = datetime.now().timestamp() + (interval_minutes * 60)
-        next_time = datetime.fromtimestamp(next_collection).strftime('%H:%M:%S')
-        print(f"⏳ Следующий сбор в {next_time} (через {interval_minutes} минут)...\n")
-        time.sleep(interval_minutes * 60)
+            print(f"❌ Ошибка в periodic_collection: {e}")
+            # В случае ошибки все равно ждем и пробуем снова
+            time.sleep(60)  # Подождем минуту и попробуем снова
 
-# [все routes остаются без изменений]
+# [Все routes остаются без изменений]
 @app.route('/')
 def index():
     return jsonify({
@@ -255,10 +217,8 @@ def health():
 
 @app.route('/api/latest')
 def get_latest():
-    """Возвращает последние собранные данные"""
     if latest_results['last_update'] is None:
         return jsonify({"error": "No data collected yet"}), 404
-    
     return jsonify({
         "last_update": latest_results['last_update'],
         "data": {
@@ -270,7 +230,6 @@ def get_latest():
 
 @app.route('/api/history')
 def get_history():
-    """Возвращает историю сборов данных"""
     history_file = "data_history.json"
     if os.path.exists(history_file):
         with open(history_file, 'r', encoding='utf-8') as f:
@@ -321,18 +280,19 @@ def api_os_adv():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     
-    # Выполняем первый сбор данных перед запуском сервера
+    # Выполняем первый сбор данных
     print("\n🔄 Первоначальный сбор данных...")
     collect_and_save_data()
     
-    # Запускаем фоновый поток для периодического сбора данных (каждые 20 минут)
+    # Запускаем фоновый поток для периодического сбора
     collection_thread = threading.Thread(
         target=periodic_collection, 
-        args=(20,),  # 20 минут
+        args=(20,),
         daemon=True
     )
     collection_thread.start()
-    print("⏰ Фоновый сбор данных запущен (интервал: 20 минут)\n")
+    print("⏰ Фоновый сбор данных запущен (интервал: 20 минут)")
+    print("📝 Первый сбор выполнен, следующие через 20 минут\n")
     
     # Запускаем сервер
     app.run(host='0.0.0.0', port=port, debug=False)
