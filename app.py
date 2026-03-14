@@ -2,7 +2,6 @@ import os
 import json
 import threading
 import time
-import requests
 from flask import Flask, jsonify
 from flask_cors import CORS
 from hardware_collector_lib.main import get_device_info
@@ -11,41 +10,48 @@ from system_info_library.main import get_system_info
 app = Flask(__name__)
 CORS(app)
 
-# Функция для вызова endpoint'ов после запуска
-def call_endpoints_after_start():
-    """Вызывает endpoints после запуска сервера"""
-    # Даем время серверу полностью запуститься
-    time.sleep(2)
-    
-    base_url = "http://localhost:5000"
-    endpoints = [
-        "/api/device",
-        "/api/os/standard", 
-        "/api/os/advanced"
-    ]
-    
+def test_functions_directly():
+    """Тестирует функции напрямую без HTTP запросов"""
     print("\n" + "="*50)
-    print("Автоматический вызов endpoints после запуска:")
+    print("Тестирование функций сбора данных:")
     print("="*50)
     
-    for endpoint in endpoints:
-        try:
-            url = f"{base_url}{endpoint}"
-            print(f"Вызов {url}...")
-            response = requests.get(url, timeout=5)
-            
-            if response.status_code == 200:
-                data = response.json()
-                print(f"✓ {endpoint}: Успешно")
-                print(f"  Статус: {response.status_code}")
-                print(f"  Размер данных: {len(str(data))} символов")
-            else:
-                print(f"✗ {endpoint}: Ошибка {response.status_code}")
-                
-        except Exception as e:
-            print(f"✗ {endpoint}: Ошибка - {str(e)}")
+    # Тестируем get_device_info
+    try:
+        device_data = get_device_info()
+        print(f"✓ get_device_info(): Успешно")
+        print(f"  Получено данных: {len(str(device_data))} символов")
+    except Exception as e:
+        print(f"✗ get_device_info(): Ошибка - {str(e)}")
+    
+    # Тестируем get_system_info(mode="standard")
+    try:
+        system_info_std = get_system_info(mode="standard")
+        print(f"✓ get_system_info(standard): Успешно")
+        if hasattr(system_info_std, 'to_dict'):
+            data = system_info_std.to_dict()
+        else:
+            data = system_info_std
+        print(f"  Получено данных: {len(str(data))} символов")
+    except Exception as e:
+        print(f"✗ get_system_info(standard): Ошибка - {str(e)}")
+    
+    # Тестируем get_system_info(mode="advanced")
+    try:
+        system_info_adv = get_system_info(mode="advanced")
+        print(f"✓ get_system_info(advanced): Успешно")
+        if hasattr(system_info_adv, 'to_flat_dict'):
+            data = system_info_adv.to_flat_dict()
+        else:
+            data = system_info_adv
+        print(f"  Получено данных: {len(str(data))} символов")
+    except Exception as e:
+        print(f"✗ get_system_info(advanced): Ошибка - {str(e)}")
     
     print("="*50 + "\n")
+
+# Запускаем тест функций ДО запуска сервера
+test_functions_directly()
 
 @app.route('/')
 def index():
@@ -99,9 +105,4 @@ def api_os_adv():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    
-    # Запускаем поток для вызова endpoints после старта сервера
-    threading.Thread(target=call_endpoints_after_start, daemon=True).start()
-    
-    # Запускаем сервер
     app.run(host='0.0.0.0', port=port, debug=False)
