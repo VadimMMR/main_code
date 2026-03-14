@@ -416,7 +416,7 @@ if __name__ == '__main__':
     # Запускаем фоновый поток для периодического сбора
     collection_thread = threading.Thread(
         target=periodic_collection, 
-        args=(20,),  # 20 минут
+        args=(10,),  # 20 минут
         daemon=True
     )
     collection_thread.start()
